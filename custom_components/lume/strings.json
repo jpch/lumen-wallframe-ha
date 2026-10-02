@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lumen-wallframe",
+        "description": "Cliente OAuth da Photos Picker API (tipo TV e dispositivos de entrada limitada). A escolha das fotos faz-se depois, no painel Lumen-wallframe.",
+        "data": {
+          "client_id": "Client ID",
+          "client_secret": "Client secret (se existir)",
+          "interval_s": "Segundos entre fotos",
+          "temp_entity": "Sensor de temperatura interior (opcional)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "O Lumen-wallframe já está instalado."
+    }
+  }
+}

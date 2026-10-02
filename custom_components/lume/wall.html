@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lumen-wallframe</title>
+<style>
+  :root {
+    --ink: #141210;
+    --cream: #f4f0e8;
+    --muted: #a39e93;
+    --amber: #e7b15a;
+    --card: #221f1b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0a0908; color: var(--cream); font-family: "DejaVu Sans", "Liberation Sans", sans-serif; }
+  #stage { position: fixed; inset: 0; display: flex; gap: 8px; padding: 8px; background: #0a0908; }
+  #stage.single { padding: 0; gap: 0; }
+  .slot { position: relative; min-width: 0; flex: 1; overflow: hidden; border-radius: 18px; background: #141210 center/cover no-repeat; }
+  #stage.single .slot { border-radius: 0; }
+  #stage.single.portrait .slot { background-size: contain; }
+  .blur {
+    position: absolute; inset: -8%;
+    background: inherit;
+    background-size: cover;
+    filter: blur(28px);
+    transform: scale(1.08);
+    opacity: 0.7;
+  }
+  #stage.single.portrait .slot .photo {
+    position: absolute; inset: 0;
+    background: center/contain no-repeat;
+  }
+  .veil {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 46%;
+    background: linear-gradient(to top, rgba(0,0,0,.62), transparent);
+    pointer-events: none;
+  }
+  .hud {
+    position: fixed; left: 4vw; right: 4vw; bottom: 4vh;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    text-shadow: 0 2px 18px rgba(0,0,0,.45);
+    pointer-events: none;
+  }
+  .time { font-weight: 300; font-size: clamp(48px, 9vw, 112px); letter-spacing: -0.04em; line-height: 0.85; font-variant-numeric: tabular-nums; }
+  .day { margin-top: 10px; font-size: clamp(14px, 2vw, 26px); opacity: 0.92; }
+  .temp { font-weight: 300; font-size: clamp(32px, 5vw, 64px); letter-spacing: -0.04em; line-height: 0.9; text-align: right; }
+  .cond, .where { font-size: clamp(12px, 1.5vw, 18px); text-align: right; opacity: 0.9; }
+  .where { letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px; margin-top: 4px; }
+  #open {
+    position: fixed; top: 16px; right: 16px; z-index: 3;
+    background: transparent; color: var(--cream); border: 0;
+    letter-spacing: 0.16em; text-transform: uppercase; font-size: 12px;
+    opacity: 0.55; cursor: pointer;
+  }
+  #sheet {
+    position: fixed; z-index: 4; top: 0; bottom: 0; left: 0; width: min(420px, 100%);
+    background: rgba(20,18,16,.96); padding: 28px 22px 40px; overflow: auto;
+    transform: translateX(-105%); transition: transform .25s ease;
+  }
+  #sheet.on { transform: none; }
+  h1 { font-weight: 400; font-size: 28px; margin: 8px 0; }
+  p { color: var(--muted); line-height: 1.45; font-size: 14px; }
+  button.act, button.choice {
+    display: block; width: 100%; margin: 8px 0; padding: 12px 14px;
+    border-radius: 12px; border: 0; font: inherit; cursor: pointer;
+  }
+  button.act { background: var(--amber); color: #1a140c; }
+  button.choice { background: var(--card); color: var(--cream); }
+  button.choice.on { outline: 1px solid var(--amber); }
+  code { font-size: 28px; letter-spacing: 0.12em; color: var(--amber); }
+  a { color: var(--amber); }
+  input {
+    width: 100%; margin: 6px 0 12px; padding: 10px 12px; border-radius: 10px;
+    border: 0; background: var(--card); color: var(--cream); font: inherit;
+  }
+  .err { color: #e7b15a; min-height: 1.2em; }
+  #empty {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    padding: 32px; text-align: center;
+  }
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div class="veil"></div>
+  <div class="hud">
+    <div>
+      <div class="time" id="clock">––:––</div>
+      <div class="day" id="day"></div>
+    </div>
+    <div>
+      <div class="temp" id="temp">––°</div>
+      <div class="cond" id="cond"></div>
+      <div class="where" id="where">Coimbra</div>
+    </div>
+  </div>
+  <button id="open" type="button">Painel</button>
+  <aside id="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="letter-spacing:.2em;font-size:12px;color:var(--amber)">LUME</div>
+      <select id="lang" style="background:transparent;color:var(--muted);border:0;font:inherit;font-size:12px"></select>
+    </div>
+    <h1 id="sheetTitle">Parede</h1>
+    <p id="sheetLead"></p>
+    <p id="count"></p>
+    <label id="albumLabel">Link do álbum</label>
+    <input id="album" placeholder="https://photos.app.goo.gl/…" />
+    <button class="act" id="albumGo" type="button">Obter álbum</button>
+    <button class="choice" id="link" type="button">Ou ligar a conta e escolher à mão</button>
+    <p id="codewrap" hidden><span id="codeLead"></span> <span id="vurl"></span> · <code id="code"></code></p>
+    <button class="choice" id="pick" type="button">Escolher fotos</button>
+    <p id="picklink" hidden><a id="picker" target="_blank" rel="noopener">Abrir a escolha no telemóvel</a></p>
+    <p class="err" id="msg"></p>
+    <p id="paceLabel">Ritmo</p>
+    <div id="intervals"></div>
+    <label id="entityLabel">Sensor de temperatura interior (opcional)</label>
+    <input id="entity" placeholder="sensor.temperatura_sala" />
+    <button class="choice" id="saveEntity" type="button">Guardar sensor</button>
+    <button class="choice" id="close" type="button">Fechar</button>
+  </aside>
+<script>
+(function () {
+  var INTERVALS = [[30, "30 s"], [60, "1 min"], [300, "5 min"], [900, "15 min"], [3600, "1 h"]];
+  var state = { items: [], interval_s: 60, weather: {} };
+  var slides = [];
+  var index = 0;
+  var timer = null;
+  var polling = null;
+  var syncing = false;
+  var albumStarted = false;
+  var lang = localStorage.getItem("lume-lang") || "pt";
+  var COPY = {
+    pt: { panel: "Painel", title: "Parede", lead: "Autenticar a conta não actualiza o álbum. Partilha o álbum por link. As fotos são descarregadas antes de entrarem na parede. Se já estiverem cá, a parede abre logo.", album: "Link do álbum", fetch: "Obter álbum", manual: "Ou ligar a conta e escolher à mão", code: "No telemóvel abre", pick: "Escolher fotos", pickOpen: "Abrir a escolha no telemóvel", pace: "Ritmo", sensor: "Sensor de temperatura interior (opcional)", save: "Guardar sensor", close: "Fechar", indoors: "casa", locale: "pt-PT", w_unavailable: "Tempo indisponível", w_clear: "Céu limpo", w_mostly: "Quase limpo", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Nevoeiro", w_drizzle: "Chuvisco", w_rain: "Chuva", w_snow: "Neve", w_thunder: "Trovoada", w_unstable: "Tempo instável" },
+    en: { panel: "Panel", title: "Wall", lead: "Signing in does not update the album. Share it by link. Photos are downloaded before they reach the wall. If they are already here, the wall opens at once.", album: "Album link", fetch: "Fetch album", manual: "Or link the account and pick by hand", code: "On the phone open", pick: "Choose photos", pickOpen: "Open the picker on the phone", pace: "Pace", sensor: "Indoor temperature sensor (optional)", save: "Save sensor", close: "Close", indoors: "indoors", locale: "en-GB", w_unavailable: "Weather unavailable", w_clear: "Clear", w_mostly: "Mostly clear", w_partly: "Partly cloudy", w_cloudy: "Cloudy", w_fog: "Fog", w_drizzle: "Drizzle", w_rain: "Rain", w_snow: "Snow", w_thunder: "Thunder", w_unstable: "Unsettled" },
+    es: { panel: "Panel", title: "Pared", lead: "Iniciar sesión no actualiza el álbum. Compártelo por enlace. Las fotos se descargan antes de entrar en la pared. Si ya están aquí, la pared abre al momento.", album: "Enlace del álbum", fetch: "Obtener álbum", manual: "O vincular la cuenta y elegir a mano", code: "En el teléfono abre", pick: "Elegir fotos", pickOpen: "Abrir la elección en el teléfono", pace: "Ritmo", sensor: "Sensor de temperatura interior (opcional)", save: "Guardar sensor", close: "Cerrar", indoors: "casa", locale: "es-ES", w_unavailable: "Tiempo no disponible", w_clear: "Cielo despejado", w_mostly: "Casi despejado", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Niebla", w_drizzle: "Llovizna", w_rain: "Lluvia", w_snow: "Nieve", w_thunder: "Tormenta", w_unstable: "Tiempo inestable" },
+    fr: { panel: "Panneau", title: "Mur", lead: "Se connecter ne met pas l’album à jour. Partage-le par lien. Les photos sont téléchargées avant d’arriver sur le mur. Si elles sont déjà là, le mur s’ouvre tout de suite.", album: "Lien de l’album", fetch: "Obtenir l’album", manual: "Ou lier le compte et choisir à la main", code: "Sur le téléphone, ouvre", pick: "Choisir des photos", pickOpen: "Ouvrir le choix sur le téléphone", pace: "Rythme", sensor: "Capteur de température intérieure (facultatif)", save: "Enregistrer le capteur", close: "Fermer", indoors: "intérieur", locale: "fr-FR", w_unavailable: "Météo indisponible", w_clear: "Ciel dégagé", w_mostly: "Peu nuageux", w_partly: "Partiellement nuageux", w_cloudy: "Nuageux", w_fog: "Brouillard", w_drizzle: "Bruine", w_rain: "Pluie", w_snow: "Neige", w_thunder: "Orage", w_unstable: "Temps instable" }
+  };
+  var NAMES = { pt: "Português", en: "English", es: "Español", fr: "Français" };
+
+  function copy() { return COPY[lang] || COPY.pt; }
+
+  function applyLang() {
+    var c = copy();
+    document.getElementById("open").textContent = c.panel;
+    document.getElementById("sheetTitle").textContent = c.title;
+    document.getElementById("sheetLead").textContent = c.lead;
+    document.getElementById("albumLabel").textContent = c.album;
+    document.getElementById("albumGo").textContent = c.fetch;
+    document.getElementById("link").textContent = c.manual;
+    document.getElementById("codeLead").textContent = c.code;
+    document.getElementById("pick").textContent = c.pick;
+    document.getElementById("picker").textContent = c.pickOpen;
+    document.getElementById("paceLabel").textContent = c.pace;
+    document.getElementById("entityLabel").textContent = c.sensor;
+    document.getElementById("saveEntity").textContent = c.save;
+    document.getElementById("close").textContent = c.close;
+    var select = document.getElementById("lang");
+    if (!select.options.length) {
+      ["pt", "en", "es", "fr"].forEach(function (code) {
+        var option = document.createElement("option");
+        option.value = code;
+        option.textContent = NAMES[code];
+        select.appendChild(option);
+      });
+      select.onchange = function () {
+        lang = select.value;
+        localStorage.setItem("lume-lang", lang);
+        post({ action: "lang", lang: lang }).catch(function () {});
+        applyLang();
+        clock();
+      };
+    }
+    select.value = lang;
+  }
+
+  function buildSlides(items) {
+    var out = [];
+    var pending = null;
+    items.forEach(function (item) {
+      if (item.h > item.w) {
+        if (pending) { out.push([pending, item]); pending = null; }
+        else pending = item;
+      } else {
+        if (pending) { out.push([pending]); pending = null; }
+        out.push([item]);
+      }
+    });
+    if (pending) out.push([pending]);
+    return out;
+  }
+
+  function paint() {
+    var stage = document.getElementById("stage");
+    stage.innerHTML = "";
+    var slide = slides[index] || [];
+    var single = slide.length < 2;
+    var portrait = single && slide[0] && slide[0].h > slide[0].w;
+    stage.className = single ? (portrait ? "single portrait" : "single") : "";
+    slide.forEach(function (photo) {
+      var slot = document.createElement("div");
+      slot.className = "slot";
+      slot.style.backgroundImage = "url('" + photo.url + "')";
+      if (portrait) {
+        var blur = document.createElement("div");
+        blur.className = "blur";
+        var fg = document.createElement("div");
+        fg.className = "photo";
+        fg.style.backgroundImage = "url('" + photo.url + "')";
+        slot.appendChild(blur);
+        slot.appendChild(fg);
+      }
+      stage.appendChild(slot);
+    });
+  }
+
+  function clock() {
+    var now = new Date();
+    var c = copy();
+    var time = new Intl.DateTimeFormat(c.locale, { timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+    var day = new Intl.DateTimeFormat(c.locale, { timeZone: "Europe/Lisbon", weekday: "long", day: "numeric", month: "long" }).format(now);
+    document.getElementById("clock").textContent = time;
+    document.getElementById("day").textContent = day;
+    var w = state.weather || {};
+    document.getElementById("temp").textContent = w.temp == null ? "––°" : Math.round(w.temp) + "°";
+    document.getElementById("cond").textContent = c["w_" + (w.key || "unavailable")] || "";
+    document.getElementById("where").textContent = w.indoor == null ? "Coimbra" : "Coimbra · " + c.indoors + " " + w.indoor + "°";
+  }
+
+  function arm() {
+    if (timer) clearInterval(timer);
+    var seconds = state.interval_s || 60;
+    timer = setInterval(function () {
+      if (!slides.length) return;
+      index = (index + 1) % slides.length;
+      paint();
+    }, seconds * 1000);
+  }
+
+  function renderIntervals() {
+    var box = document.getElementById("intervals");
+    box.innerHTML = "";
+    INTERVALS.forEach(function (pair) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "choice" + (pair[0] === state.interval_s ? " on" : "");
+      button.textContent = pair[1];
+      button.onclick = function () {
+        fetch("/api/lume/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "interval", seconds: pair[0] }) })
+          .then(function () { return load(); });
+      };
+      box.appendChild(button);
+    });
+  }
+
+  function load() {
+    return fetch("/api/lume/state").then(function (r) { return r.json(); }).then(function (data) {
+      var sig = (data.items || []).map(function (i) { return i.id; }).join(",");
+      var prev = (state.items || []).map(function (i) { return i.id; }).join(",");
+      state = data;
+      if (sig !== prev) {
+        slides = buildSlides(data.items || []);
+        index = 0;
+        paint();
+      }
+      document.getElementById("count").textContent = data.count ? data.count + " fotos guardadas." : "Ainda sem fotos escolhidas.";
+      document.getElementById("entity").value = data.temp_entity || "";
+      if (data.lang && COPY[data.lang]) lang = data.lang;
+      applyLang();
+      var albumInput = document.getElementById("album");
+      if (document.activeElement !== albumInput) albumInput.value = data.album_url || "";
+      var flow = data.flow || {};
+      if (flow.user_code) {
+        document.getElementById("codewrap").hidden = false;
+        document.getElementById("code").textContent = flow.user_code;
+        document.getElementById("vurl").textContent = flow.verification_url || "google.com/device";
+      }
+      if (flow.picker_uri) {
+        document.getElementById("picklink").hidden = false;
+        document.getElementById("picker").href = flow.picker_uri;
+      }
+      if (flow.error) document.getElementById("msg").textContent = flow.error;
+      renderIntervals();
+      clock();
+      arm();
+      if (!data.count) document.getElementById("sheet").classList.add("on");
+      if (!syncing) maybeAlbum();
+    }).catch(function (err) {
+      document.getElementById("msg").textContent = String(err);
+    });
+  }
+
+  function post(body) {
+    return fetch("/api/lume/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (data) { if (!r.ok) throw new Error(data.error || "erro"); return data; }); });
+  }
+
+  function maybeAlbum() {
+    if (albumStarted || syncing || !state.album_url) return;
+    albumStarted = true;
+    runAlbum(state.album_url, true);
+  }
+
+  function runAlbum(url, quiet) {
+    if (syncing) return;
+    syncing = true;
+    if (!quiet) document.getElementById("msg").textContent = "A ler o álbum…";
+    post({ action: "album_prepare", url: url }).then(function (data) {
+      var step = function () {
+        post({ action: "album_step" }).then(function (res) {
+          if (!quiet) {
+            document.getElementById("msg").textContent = res.done
+              ? "Álbum guardado."
+              : "A obter " + (res.have || 0) + " de " + (res.total || 0) + "…";
+          }
+          if (res.error) document.getElementById("msg").textContent = res.error;
+          if (res.done) {
+            syncing = false;
+            load();
+          } else {
+            step();
+          }
+        }).catch(function (err) {
+          syncing = false;
+          document.getElementById("msg").textContent = String(err.message || err);
+        });
+      };
+      if (!quiet && data.total) {
+        document.getElementById("msg").textContent = "A obter 0 de " + data.total + "…";
+      }
+      step();
+    }).catch(function (err) {
+      syncing = false;
+      document.getElementById("msg").textContent = String(err.message || err);
+    });
+  }
+
+  document.getElementById("albumGo").onclick = function () {
+    runAlbum(document.getElementById("album").value, false);
+  };
+
+  document.getElementById("open").onclick = function () { document.getElementById("sheet").classList.add("on"); };
+  document.getElementById("close").onclick = function () { document.getElementById("sheet").classList.remove("on"); };
+  document.getElementById("link").onclick = function () {
+    document.getElementById("msg").textContent = "A pedir código…";
+    post({ action: "device_start" }).then(function (data) {
+      document.getElementById("codewrap").hidden = false;
+      document.getElementById("code").textContent = data.user_code || "";
+      document.getElementById("vurl").textContent = data.verification_url || "";
+      document.getElementById("msg").textContent = "À espera do telemóvel…";
+      if (polling) clearInterval(polling);
+      polling = setInterval(function () {
+        post({ action: "device_poll" }).then(function (res) {
+          if (res.connected) {
+            clearInterval(polling);
+            document.getElementById("msg").textContent = "Conta ligada. Já podes escolher as fotos.";
+          } else if (res.error) {
+            clearInterval(polling);
+            document.getElementById("msg").textContent = res.error;
+          }
+        }).catch(function (err) {
+          clearInterval(polling);
+          document.getElementById("msg").textContent = String(err.message || err);
+        });
+      }, 5000);
+    }).catch(function (err) { document.getElementById("msg").textContent = String(err.message || err); });
+  };
+  document.getElementById("pick").onclick = function () {
+    document.getElementById("msg").textContent = "A abrir a escolha…";
+    post({ action: "picker_start" }).then(function (data) {
+      document.getElementById("picklink").hidden = false;
+      document.getElementById("picker").href = data.picker_uri;
+      document.getElementById("msg").textContent = "Confirma as fotos no telemóvel.";
+      if (polling) clearInterval(polling);
+      polling = setInterval(function () {
+        post({ action: "picker_poll" }).then(function (res) {
+          if (res.waiting) return;
+          document.getElementById("msg").textContent = "A transferir " + (res.have || 0) + " de " + (res.total || 0) + "…";
+          if (res.done) {
+            clearInterval(polling);
+            document.getElementById("msg").textContent = "Fotos guardadas.";
+            load();
+          }
+        }).catch(function (err) {
+          clearInterval(polling);
+          document.getElementById("msg").textContent = String(err.message || err);
+        });
+      }, 2500);
+    }).catch(function (err) { document.getElementById("msg").textContent = String(err.message || err); });
+  };
+  document.getElementById("saveEntity").onclick = function () {
+    post({ action: "entity", entity: document.getElementById("entity").value }).then(function () {
+      document.getElementById("msg").textContent = "Sensor guardado.";
+      load();
+    });
+  };
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") document.getElementById("sheet").classList.remove("on");
+  });
+  setInterval(clock, 1000);
+  setInterval(load, 60000);
+  setInterval(function () {
+    if (state.album_url && !syncing) runAlbum(state.album_url, true);
+  }, 20 * 60 * 1000);
+  applyLang();
+  clock();
+  load();
+})();
+</script>
+</body>
+</html>
