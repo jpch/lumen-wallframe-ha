@@ -1,17 +1,48 @@
 # -*- coding: utf-8 -*-
-"""Lumen-wallframe state inside Home Assistant. Blocking network calls run in an executor."""
+"""Lumen-wallframe state inside Home Assistant.
+
+Everything here does blocking disk or network IO: call it from the executor
+(hass.async_add_executor_job), never from the event loop.
+
+The album: the list of photos in the shared album is re-read at start-up, every hour and
+when "Fetch album" is pressed, without downloading the photos (library.py). The wall goes
+through it in a shuffled cycle (rotation.py), driven from here so that every screen showing
+the wall shows the same slide: slide_state() hands out the current slide, moves on when its
+time is up, and the caller then prefetches the next slides in the background. Each photo is
+downloaded just before it shows and kept in /config/lume/cache.
+"""
 import json
 import os
+import threading
 import time
 
 from . import album
 from . import google_photos
+from . import overlay
 from . import weather
+from .library import Library, safe_name
 from .slides import build_slides
+
+VERSION = "1.2.0"
+PHOTO_EDGE = 1920
+ALBUM_CHECK_S = 60 * 60
+PACES = (15, 30, 60, 300, 900, 3600)
+
+
+class LumeError(Exception):
+    """A problem to show on the wall. key picks the translated text in wall.html ("err_" + key)."""
+
+    def __init__(self, key, message):
+        Exception.__init__(self, message)
+        self.key = key
+
+
+def _download(remote, dest):
+    album.download_image(remote, dest, PHOTO_EDGE)
 
 
 class Runtime(object):
-    def __init__(self, hass, entry):
+    def __init__(self, hass, entry, log=None):
         self.hass = hass
         self.entry = entry
         self.root = hass.config.path("lume")
@@ -20,6 +51,27 @@ class Runtime(object):
         self.flow_path = os.path.join(self.root, "flow.json")
         self.mem = {}
         self.weather_cache = {"at": 0, "temp": None, "label": "…"}
+        self._log = log or (lambda msg: None)
+        self.library = None
+        self._lock = threading.Lock()
+        self._check_lock = threading.Lock()
+        self.slide = []
+        self.slide_until = 0.0
+        self.seq = 0
+        self.rev = 0
+        self.prefetching = False
+
+    def load(self):
+        """Reads the album list from disk; the first time, takes over the old manifest."""
+        self.ensure_dirs()
+        self.library = Library(self.root, self.cache, _download, log=self._log)
+        if not self.library.has_list():
+            old = self._legacy_items()
+            if old:
+                url = self._data().get("album_url") or ""
+                self.library.set_photos(old, "album" if url else "google", url, prune=False, checked=0)
+                self._log("moved %d photos from the old manifest" % len(old))
+        return self
 
     def ensure_dirs(self):
         if not os.path.isdir(self.cache):
@@ -45,7 +97,7 @@ class Runtime(object):
         if data.get("access_token") and now < float(data.get("access_expires") or 0) - 30:
             return data["access_token"]
         if not data.get("refresh_token"):
-            raise RuntimeError("Liga primeiro a conta Google.")
+            raise LumeError("link_first", "Liga primeiro a conta Google.")
         tok = google_photos.refresh_access_token(
             data.get("client_id") or "",
             data.get("client_secret") or "",
@@ -71,7 +123,8 @@ class Runtime(object):
             json.dump(flow, fh)
         os.rename(tmp, self.flow_path)
 
-    def read_items(self):
+    def _legacy_items(self):
+        """Photos listed by versions up to 1.1.2 (manifest.json, all already in the cache)."""
         if not os.path.exists(self.manifest_path):
             return []
         try:
@@ -82,29 +135,14 @@ class Runtime(object):
         items = []
         for item in data.get("items") or []:
             name = item.get("name")
-            path = os.path.join(self.cache, name) if name else ""
-            if name and os.path.isfile(path):
-                items.append(
-                    {
-                        "id": item.get("id") or name,
-                        "name": name,
-                        "w": int(item.get("w") or 1),
-                        "h": int(item.get("h") or 1),
-                    }
-                )
+            if name and os.path.isfile(os.path.join(self.cache, name)):
+                items.append({"id": item.get("id") or name, "name": name, "w": item.get("w"), "h": item.get("h")})
         return items
-
-    def write_items(self, items):
-        self.ensure_dirs()
-        tmp = self.manifest_path + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump({"items": items}, fh)
-        os.rename(tmp, self.manifest_path)
 
     def device_start(self):
         data = self._data()
         if not data.get("client_id"):
-            raise RuntimeError("Falta o Client ID na integração.")
+            raise LumeError("client_id", "Falta o Client ID na integração.")
         started = google_photos.start_device_flow(data.get("client_id"), data.get("client_secret") or "")
         flow = self.read_flow()
         flow["device_code"] = started.get("device_code")
@@ -123,9 +161,9 @@ class Runtime(object):
     def device_poll(self):
         flow = self.read_flow()
         if not flow.get("device_code"):
-            return {"pending": False, "connected": bool(self._data().get("refresh_token")), "error": "Ainda não há código."}
+            return {"pending": False, "connected": bool(self._data().get("refresh_token")), "error": "Ainda não há código.", "error_key": "no_code"}
         if time.time() > float(flow.get("device_deadline") or 0):
-            return {"pending": False, "connected": False, "error": "O código expirou."}
+            return {"pending": False, "connected": False, "error": "O código expirou.", "error_key": "expired"}
         data = self._data()
         try:
             tok = google_photos.poll_device_token(
@@ -154,7 +192,7 @@ class Runtime(object):
         flow["saved"] = []
         flow["error"] = ""
         if not flow["session_id"] or not flow["picker_uri"]:
-            raise RuntimeError("O Google não abriu a sessão de escolha.")
+            raise LumeError("no_session", "O Google não abriu a sessão de escolha.")
         self.write_flow(flow)
         return {"picker_uri": flow["picker_uri"]}
 
@@ -162,7 +200,7 @@ class Runtime(object):
         flow = self.read_flow()
         sid = flow.get("session_id")
         if not sid:
-            return {"done": False, "error": "Ainda não há uma escolha a decorrer.", "have": 0, "total": 0}
+            return {"done": False, "error": "Ainda não há uma escolha a decorrer.", "error_key": "no_pick", "have": 0, "total": 0}
         token = self.access_token()
         if not flow.get("queue_ready"):
             info = google_photos.get_session(token, sid)
@@ -193,8 +231,8 @@ class Runtime(object):
         rest = queue[3:]
         self.ensure_dirs()
         for item in batch:
-            safe = "".join(ch for ch in (item.get("id") or "") if ch.isalnum())[:48] or "foto"
-            name = safe + ".jpg"
+            name = safe_name(item.get("id") or "")
+            safe = name[:-4]
             dest = os.path.join(self.cache, name)
             try:
                 ok = google_photos.download_photo(token, item, dest)
@@ -208,7 +246,11 @@ class Runtime(object):
         flow["saved"] = saved
         done = len(rest) == 0
         if done:
-            self.write_items(saved)
+            if saved:
+                # Picked photos do not follow the album: the hourly check leaves them alone
+                # until "Fetch album" is pressed again.
+                self.library.set_photos(saved, "google")
+                self._bump()
             flow["phase"] = "ready"
             flow["queue_ready"] = False
         self.write_flow(flow)
@@ -221,74 +263,122 @@ class Runtime(object):
             "picker_uri": flow.get("picker_uri") or "",
         }
 
+    # -- settings --------------------------------------------------------------------
+
+    def _bump(self):
+        self.rev += 1
+
+    def interval(self):
+        try:
+            seconds = int(self._data().get("interval_s") or 60)
+        except (TypeError, ValueError):
+            seconds = 60
+        return max(10, seconds)
+
     def set_interval(self, seconds):
-        self.mem["interval_s"] = int(seconds)
+        seconds = max(10, int(seconds))
+        self.mem["interval_s"] = seconds
+        with self._lock:
+            self.slide_until = min(self.slide_until, time.time() + seconds)
+        self._bump()
 
     def set_entity(self, entity_id):
         self.mem["temp_entity"] = (entity_id or "").strip()
-
-    def album_prepare(self, url):
-        remote = album.list_album(url)
-        flow = self.read_flow()
-        flow["album_url"] = url
-        flow["album_queue"] = remote
-        flow["album_saved"] = []
-        flow["phase"] = "album"
-        flow["error"] = ""
-        self.write_flow(flow)
-        self.mem["album_url"] = url
-        return {"total": len(remote), "have": 0, "done": False}
-
-    def album_step(self):
-        flow = self.read_flow()
-        queue = list(flow.get("album_queue") or [])
-        saved = list(flow.get("album_saved") or [])
-        if not queue:
-            if saved:
-                self.write_items(saved)
-                flow["phase"] = "album-ready"
-            self.write_flow(flow)
-            return {"done": True, "have": len(saved), "total": len(saved), "error": flow.get("error") or ""}
-        batch = queue[:3]
-        rest = queue[3:]
-        self.ensure_dirs()
-        for item in batch:
-            name = album.safe_name(item.get("id") or "") + ".jpg"
-            dest = os.path.join(self.cache, name)
-            try:
-                if not os.path.isfile(dest) or os.path.getsize(dest) < 800:
-                    album.download_image(item.get("remote") or "", dest)
-            except Exception:
-                continue
-            saved.append(
-                {
-                    "id": item.get("id") or name,
-                    "name": name,
-                    "w": int(item.get("w") or 1),
-                    "h": int(item.get("h") or 1),
-                }
-            )
-        flow["album_queue"] = rest
-        flow["album_saved"] = saved
-        done = not rest
-        if done and saved:
-            self.write_items(saved)
-            flow["phase"] = "album-ready"
-            flow["error"] = ""
-        elif done:
-            flow["phase"] = "album-ready"
-            flow["error"] = "Nenhuma foto foi guardada."
-        self.write_flow(flow)
-        return {
-            "done": done,
-            "have": len(saved),
-            "total": len(saved) + len(rest),
-            "error": flow.get("error") or "",
-        }
+        self._bump()
 
     def set_lang(self, lang):
         code = lang if lang in ("pt", "en", "es", "fr") else "pt"
         self.mem["lang"] = code
+        self._bump()
+
+    def overlay_style(self):
+        return overlay.normalize(self._data().get("overlay"))
+
+    def set_overlay(self, style):
+        self.mem["overlay"] = overlay.normalize(style)
+        self._bump()
+        return self.mem["overlay"]
+
+    # -- album -----------------------------------------------------------------------
+
+    def album_url(self):
+        return (self._data().get("album_url") or "").strip()
+
+    def refresh_album(self, url=None, hourly=False):
+        """Re-reads the album list (no photo downloads). url: a new link from the panel.
+
+        The hourly check does nothing without a link, or while the photos were picked by hand.
+        Returns the counts, or None when nothing was done.
+        """
+        target = (url or "").strip() or self.album_url()
+        if not target:
+            if hourly:
+                return None
+            raise LumeError("bad_link", "Cola primeiro o link do álbum.")
+        if hourly and self.library.source == "google":
+            return None
+        album.validate_share_url(target)
+        if not self._check_lock.acquire(False):
+            return None
+        try:
+            remote = album.list_album(target)
+            self.library.set_photos(remote, "album", target)
+        finally:
+            self._check_lock.release()
+        self.mem["album_url"] = target
+        self._bump()
+        total, cached = self.library.counts()
+        self._log("album checked: %d photos, %d saved" % (total, cached))
+        return {"total": total, "cached": cached}
+
+    def prefetch(self):
+        """Downloads the next two planned slides. One prefetch at a time."""
+        with self._lock:
+            if self.prefetching:
+                return 0
+            self.prefetching = True
+        try:
+            return self.library.prefetch(2)
+        except Exception as exc:
+            self._log("prefetch: %s" % exc)
+            return 0
+        finally:
+            with self._lock:
+                self.prefetching = False
+
+    def _public(self, photo):
+        return {"id": photo["id"], "w": photo["w"], "h": photo["h"], "url": "/api/lume/media/" + photo["name"]}
+
+    def slide_state(self, now=None):
+        """The slide every wall shows right now, moving on when its time is up.
+
+        If no photo is downloaded yet the slide is empty; the caller prefetches and asks again.
+        When the next slide is not ready (offline), the current one stays up a little longer.
+        """
+        now = time.time() if now is None else now
+        interval = self.interval()
+        with self._lock:
+            if not self.slide or now >= self.slide_until:
+                nxt = self.library.next()
+                if nxt:
+                    self.slide = nxt
+                    self.seq += 1
+                    self.slide_until = now + interval
+                elif self.slide:
+                    self.slide_until = now + min(interval, 10)
+            slide = list(self.slide)
+            remaining = max(0.0, self.slide_until - now) if slide else 2.0
+            seq = self.seq
+        total, cached = self.library.counts()
+        return {
+            "seq": seq,
+            "slide": [self._public(p) for p in slide],
+            "next": [[self._public(p) for p in s] for s in self.library.upcoming(1)],
+            "remaining_ms": int(remaining * 1000),
+            "rev": self.rev,
+            "total": total,
+            "cached": cached,
+        }
 
     def weather(self):
         now = time.time()
@@ -313,26 +403,26 @@ class Runtime(object):
         return self.weather_cache
 
     def public_state(self, indoor):
-        items = self.read_items()
         flow = self.read_flow()
         meteo = self.weather()
         data = self._data()
-        public = []
-        for item in items:
-            public.append(
-                {
-                    "id": item["id"],
-                    "w": item["w"],
-                    "h": item["h"],
-                    "url": "/api/lume/media/" + item["name"],
-                }
-            )
+        total, cached = self.library.counts()
+        # "items" (photos already saved) keeps a wall page from 1.1.x working until it reloads.
+        public = [self._public(p) for p in self.library.cached_photos()]
         return {
+            "version": VERSION,
+            "rev": self.rev,
             "connected": bool(data.get("refresh_token") or data.get("access_token")),
-            "interval_s": int(data.get("interval_s") or 60),
+            "interval_s": self.interval(),
+            "paces": list(PACES),
             "temp_entity": data.get("temp_entity") or "",
             "album_url": data.get("album_url") or flow.get("album_url") or "",
             "lang": data.get("lang") or "pt",
+            "overlay": self.overlay_style(),
+            "source": self.library.source,
+            "total": total,
+            "cached": cached,
+            "checked": self.library.checked,
             "count": len(public),
             "items": public,
             "slides": len(build_slides(public)),
@@ -347,8 +437,6 @@ class Runtime(object):
                 "picker_uri": flow.get("picker_uri") or "",
                 "phase": flow.get("phase") or "",
                 "error": flow.get("error") or "",
-                "album_have": len(flow.get("album_saved") or []),
-                "album_total": len(flow.get("album_saved") or []) + len(flow.get("album_queue") or []),
             },
         }
 

@@ -64,6 +64,16 @@ def symbol_key(code):
     return "unstable"
 
 
+def describe_weather(code, lang="pt"):
+    """Translated label for an Open-Meteo weather code."""
+    return i18n.tr(lang, "w_" + weather_key(code))
+
+
+def describe_symbol(code, lang="pt"):
+    """Translated label for a MET Norway symbol code (e.g. "clearsky_night")."""
+    return i18n.tr(lang, "w_" + symbol_key(code))
+
+
 def lisbon_parts(lang="pt"):
     os.environ["TZ"] = "Europe/Lisbon"
     try:

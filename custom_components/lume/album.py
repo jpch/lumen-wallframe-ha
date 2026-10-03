@@ -2,7 +2,12 @@
 """Shared Google Photos album, without OAuth.
 
 The link (photos.app.goo.gl or photos.google.com/share) belongs to the album owner.
-The photos are downloaded to disk before the wall shows them.
+list_album() only reads the album page (the list of photos, videos left out); each photo is
+downloaded on its own with download_image(), just before the wall needs it (see library.py).
+
+This file is shared by the Raspberry Pi app (pi/album.py in jpch/Lumen-wallframe) and the
+Home Assistant integration (custom_components/lume/album.py in jpch/lumen-wallframe-ha).
+Keep the two copies identical. Python 3.6 compatible.
 """
 import os
 import re
@@ -30,7 +35,11 @@ VIDEO_SIGNALS = (
 
 
 class AlbumError(Exception):
-    pass
+    """An album problem to show to the user. key picks the translated text ("err_" + key)."""
+
+    def __init__(self, key, message):
+        Exception.__init__(self, message)
+        self.key = key
 
 
 def validate_share_url(url):
@@ -39,10 +48,10 @@ def validate_share_url(url):
     host = (parsed.hostname or "").lower()
     if parsed.scheme not in ("http", "https") or host not in ALLOWED_HOSTS:
         raise AlbumError(
-            "O link tem de ser de um álbum partilhado: photos.app.goo.gl ou photos.google.com/share."
+            "bad_link", "O link tem de ser de um álbum partilhado: photos.app.goo.gl ou photos.google.com/share."
         )
     if host == "photos.google.com" and not parsed.path.startswith("/share/"):
-        raise AlbumError("Abre o álbum, escolhe Partilhar e copia o link, não o endereço da tua biblioteca.")
+        raise AlbumError("not_shared", "Abre o álbum, escolhe Partilhar e copia o link, não o endereço da tua biblioteca.")
     return raw
 
 
@@ -110,13 +119,15 @@ def list_album(share_url):
     found = parse_album_page(_read(validate_share_url(share_url)))
     if not found:
         raise AlbumError(
-            "Não encontrei fotos. Confirma que o álbum está partilhado com «qualquer pessoa com o link»."
+            "empty", "Não encontrei fotos. Confirma que o álbum está partilhado com «qualquer pessoa com o link»."
         )
     return found
 
 
-def sized_url(remote):
-    return remote.split("=")[0] + "=w1280-h1280"
+def sized_url(remote, edge=1280):
+    """Google's size suffix: the photo comes back with its longest side at most `edge` px."""
+    edge = int(edge)
+    return remote.split("=")[0] + "=w%d-h%d" % (edge, edge)
 
 
 def safe_name(uid):
@@ -124,11 +135,11 @@ def safe_name(uid):
     return (keep or "foto")[:80]
 
 
-def download_image(remote, dest_path):
+def download_image(remote, dest_path, edge=1280):
     host = (urllib.parse.urlparse(remote).hostname or "").lower()
     if not host.endswith("googleusercontent.com"):
-        raise AlbumError("Endereço de foto inesperado.")
-    req = urllib.request.Request(sized_url(remote), headers={"User-Agent": UA})
+        raise AlbumError("bad_photo_url", "Endereço de foto inesperado.")
+    req = urllib.request.Request(sized_url(remote, edge), headers={"User-Agent": UA})
     resp = urllib.request.urlopen(req, timeout=120)
     tmp = dest_path + ".part"
     try:
@@ -147,29 +158,6 @@ def download_image(remote, dest_path):
         magic = b""
     if magic[:2] != b"\xff\xd8" and magic != b"\x89PN":
         os.remove(tmp)
-        raise AlbumError("O Google não devolveu uma imagem.")
+        raise AlbumError("not_image", "O Google não devolveu uma imagem.")
     os.rename(tmp, dest_path)
 
-
-def sync_album(share_url, cache_dir, progress=None):
-    """Downloads everything and only then returns the list. The caller writes the manifest at the end."""
-    remote = list_album(share_url)
-    if not os.path.isdir(cache_dir):
-        os.makedirs(cache_dir)
-    saved = []
-    total = len(remote)
-    for index, item in enumerate(remote):
-        if progress:
-            progress(index, total)
-        dest = os.path.join(cache_dir, safe_name(item["id"]) + ".jpg")
-        if not os.path.isfile(dest) or os.path.getsize(dest) < 800:
-            download_image(item["remote"], dest)
-        saved.append({"id": item["id"], "file": dest, "w": item["w"], "h": item["h"], "name": os.path.basename(dest)})
-    keep = set(os.path.basename(item["file"]) for item in saved)
-    for name in os.listdir(cache_dir):
-        if name.endswith(".jpg") and name not in keep:
-            try:
-                os.remove(os.path.join(cache_dir, name))
-            except OSError:
-                pass
-    return saved

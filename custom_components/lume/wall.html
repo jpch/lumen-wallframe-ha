@@ -11,14 +11,18 @@
     --muted: #a39e93;
     --amber: #e7b15a;
     --card: #221f1b;
+    --wall-ink: #f4f0e8;
+    --wall-halo: 0 2px 8px rgba(0,0,0,.6);
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #0a0908; color: var(--cream); font-family: "DejaVu Sans", "Liberation Sans", sans-serif; }
-  #stage { position: fixed; inset: 0; display: flex; gap: 8px; padding: 8px; background: #0a0908; }
-  #stage.single { padding: 0; gap: 0; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0908; color: var(--cream); font-family: "DejaVu Sans", "Liberation Sans", sans-serif; }
+  #stage { position: fixed; inset: 0; background: #0a0908; }
+  .layer { position: absolute; inset: 0; display: flex; gap: 8px; padding: 8px; opacity: 0; transition: opacity .8s ease; }
+  .layer.on { opacity: 1; }
+  .layer.single { padding: 0; gap: 0; }
   .slot { position: relative; min-width: 0; flex: 1; overflow: hidden; border-radius: 18px; background: #141210 center/cover no-repeat; }
-  #stage.single .slot { border-radius: 0; }
-  #stage.single.portrait .slot { background-size: contain; }
+  .layer.single .slot { border-radius: 0; }
+  .layer.single.portrait .slot { background-size: contain; }
   .blur {
     position: absolute; inset: -8%;
     background: inherit;
@@ -27,19 +31,14 @@
     transform: scale(1.08);
     opacity: 0.7;
   }
-  #stage.single.portrait .slot .photo {
-    position: absolute; inset: 0;
-    background: center/contain no-repeat;
-  }
-  .veil {
-    position: fixed; left: 0; right: 0; bottom: 0; height: 46%;
-    background: linear-gradient(to top, rgba(0,0,0,.62), transparent);
-    pointer-events: none;
-  }
+  .layer.single.portrait .slot .photo { position: absolute; inset: 0; background: center/contain no-repeat; }
+  .band { position: fixed; left: 0; right: 0; pointer-events: none; z-index: 1; }
+  .band.top { top: 0; }
+  .band.bottom { bottom: 0; }
   .hud {
-    position: fixed; left: 4vw; right: 4vw; bottom: 4vh;
+    position: fixed; left: 4vw; right: 4vw; bottom: 4vh; z-index: 2;
     display: flex; align-items: flex-end; justify-content: space-between;
-    text-shadow: 0 2px 18px rgba(0,0,0,.45);
+    color: var(--wall-ink); text-shadow: var(--wall-halo);
     pointer-events: none;
   }
   .time { font-weight: 300; font-size: clamp(48px, 9vw, 112px); letter-spacing: -0.04em; line-height: 0.85; font-variant-numeric: tabular-nums; }
@@ -47,20 +46,43 @@
   .temp { font-weight: 300; font-size: clamp(32px, 5vw, 64px); letter-spacing: -0.04em; line-height: 0.9; text-align: right; }
   .cond, .where { font-size: clamp(12px, 1.5vw, 18px); text-align: right; opacity: 0.9; }
   .where { letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px; margin-top: 4px; }
-  #open {
-    position: fixed; top: 16px; right: 16px; z-index: 3;
-    background: transparent; color: var(--cream); border: 0;
-    letter-spacing: 0.16em; text-transform: uppercase; font-size: 12px;
-    opacity: 0.55; cursor: pointer;
+  #bar {
+    position: fixed; top: 12px; right: 14px; z-index: 3;
+    display: flex; align-items: center; gap: 2px;
+    color: var(--wall-ink); text-shadow: var(--wall-halo);
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
   }
+  #bar .link, #bar .dot { opacity: 0.75; }
+  .link { background: transparent; color: inherit; border: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; text-shadow: inherit; cursor: pointer; padding: 6px 6px; }
+  .link:hover { opacity: 1; }
+  /* Dropdowns open right under their label: the menu is positioned inside the label's box. */
+  .menu-wrap { position: relative; display: inline-block; }
+  .menu {
+    position: absolute; top: 100%; right: 0; margin-top: 4px; z-index: 10; display: none;
+    min-width: 150px; padding: 6px 0; border-radius: 12px;
+    background: rgba(28,25,22,.98); box-shadow: 0 8px 28px rgba(0,0,0,.45);
+    text-transform: none; letter-spacing: normal; text-shadow: none;
+  }
+  .menu.left { right: auto; left: 0; }
+  .menu.on { display: block; }
+  .menu button {
+    display: block; width: 100%; text-align: left; padding: 9px 16px; border: 0; background: transparent;
+    color: var(--cream); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+  }
+  .menu button:hover { background: rgba(231,177,90,.16); }
+  .menu button.on { color: var(--amber); font-weight: 700; }
   #sheet {
     position: fixed; z-index: 4; top: 0; bottom: 0; left: 0; width: min(420px, 100%);
-    background: rgba(20,18,16,.96); padding: 28px 22px 40px; overflow: auto;
+    background: rgba(20,18,16,.96); padding: 22px 22px 40px; overflow: auto;
     transform: translateX(-105%); transition: transform .25s ease;
   }
   #sheet.on { transform: none; }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; }
+  .brand { letter-spacing: .2em; font-size: 12px; color: var(--amber); }
+  #sheetLang { color: var(--muted); font-size: 13px; }
   h1 { font-weight: 400; font-size: 28px; margin: 8px 0; }
   p { color: var(--muted); line-height: 1.45; font-size: 14px; }
+  #count { color: var(--cream); }
   button.act, button.choice {
     display: block; width: 100%; margin: 8px 0; padding: 12px 14px;
     border-radius: 12px; border: 0; font: inherit; cursor: pointer;
@@ -68,22 +90,55 @@
   button.act { background: var(--amber); color: #1a140c; }
   button.choice { background: var(--card); color: var(--cream); }
   button.choice.on { outline: 1px solid var(--amber); }
+  #intervals { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  #sheet label { display: block; margin-top: 6px; }
+  #intervals button.choice { width: auto; flex: 1 0 28%; margin: 0; }
   code { font-size: 28px; letter-spacing: 0.12em; color: var(--amber); }
   a { color: var(--amber); }
-  input {
+  input[type=text], input:not([type]) {
     width: 100%; margin: 6px 0 12px; padding: 10px 12px; border-radius: 10px;
     border: 0; background: var(--card); color: var(--cream); font: inherit;
   }
   .err { color: #e7b15a; min-height: 1.2em; }
   #empty {
-    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    padding: 32px; text-align: center;
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1;
+    padding: 32px; text-align: center; color: var(--muted);
   }
+  #empty.on { display: flex; }
+  /* Customize dialog */
+  #customize {
+    position: fixed; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.35); padding: 16px;
+  }
+  #customize.on { display: flex; }
+  .dialog {
+    width: min(900px, 100%); max-height: 100%; overflow: auto; border-radius: 22px; padding: 22px 24px 16px;
+    background: #2a2622; color: var(--cream); box-shadow: 0 18px 60px rgba(0,0,0,.5);
+  }
+  .dialog h2 { font-weight: 400; font-size: 22px; margin: 0 0 14px; }
+  .dialog-body { display: flex; gap: 24px; flex-wrap: wrap; }
+  .preview { position: relative; flex: 1 1 300px; aspect-ratio: 1.6; min-height: 160px; border-radius: 12px; overflow: hidden; background: #000 center/cover no-repeat; }
+  .preview .band { position: absolute; z-index: 0; }
+  .preview .pclock { position: absolute; left: 12px; bottom: 10px; font-size: 28px; font-weight: 300; }
+  .preview .pbar { position: absolute; right: 10px; top: 8px; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+  .controls { flex: 1 1 300px; }
+  .controls label { display: block; margin: 10px 0 2px; font-size: 14px; }
+  .controls input[type=range] { width: 100%; accent-color: var(--amber); }
+  .swatches { display: flex; gap: 10px; margin: 6px 0 4px; flex-wrap: wrap; }
+  .swatch { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #8a8076; padding: 2px; background-clip: content-box; cursor: pointer; }
+  .swatch.on { border: 3px solid var(--amber); padding: 4px; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 14px; }
+  .toggle input { width: 22px; height: 22px; accent-color: var(--amber); }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .dialog-actions button { background: transparent; border: 0; color: var(--amber); font: inherit; padding: 10px 14px; cursor: pointer; border-radius: 10px; }
+  .dialog-actions button:hover { background: rgba(231,177,90,.12); }
 </style>
 </head>
 <body>
   <div id="stage"></div>
-  <div class="veil"></div>
+  <div class="band top" id="bandTop"></div>
+  <div class="band bottom" id="bandBottom"></div>
+  <div id="empty"></div>
   <div class="hud">
     <div>
       <div class="time" id="clock">––:––</div>
@@ -95,11 +150,16 @@
       <div class="where" id="where">Coimbra</div>
     </div>
   </div>
-  <button id="open" type="button">Painel</button>
+  <div id="bar">
+    <span class="menu-wrap"><button class="link" type="button" id="barLang" data-menu="lang"></button><span class="menu" id="menuLang"></span></span>
+    <button class="link" id="open" type="button">Painel</button>
+    <span class="dot">·</span>
+    <span class="menu-wrap"><button class="link" type="button" id="barPace" data-menu="pace"></button><span class="menu" id="menuPace"></span></span>
+  </div>
   <aside id="sheet">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="letter-spacing:.2em;font-size:12px;color:var(--amber)">LUME</div>
-      <select id="lang" style="background:transparent;color:var(--muted);border:0;font:inherit;font-size:12px"></select>
+    <div class="sheet-head">
+      <div class="brand">LUMEN-WALLFRAME</div>
+      <span class="menu-wrap"><button class="link" type="button" id="sheetLang" data-menu="lang"></button><span class="menu" id="menuSheetLang"></span></span>
     </div>
     <h1 id="sheetTitle">Parede</h1>
     <p id="sheetLead"></p>
@@ -107,96 +167,280 @@
     <label id="albumLabel">Link do álbum</label>
     <input id="album" placeholder="https://photos.app.goo.gl/…" />
     <button class="act" id="albumGo" type="button">Obter álbum</button>
-    <button class="choice" id="link" type="button">Ou ligar a conta e escolher à mão</button>
-    <p id="codewrap" hidden><span id="codeLead"></span> <span id="vurl"></span> · <code id="code"></code></p>
-    <button class="choice" id="pick" type="button">Escolher fotos</button>
-    <p id="picklink" hidden><a id="picker" target="_blank" rel="noopener">Abrir a escolha no telemóvel</a></p>
     <p class="err" id="msg"></p>
+    <button class="choice" id="customizeOpen" type="button">Personalizar</button>
     <p id="paceLabel">Ritmo</p>
     <div id="intervals"></div>
     <label id="entityLabel">Sensor de temperatura interior (opcional)</label>
     <input id="entity" placeholder="sensor.temperatura_sala" />
     <button class="choice" id="saveEntity" type="button">Guardar sensor</button>
+    <button class="choice" id="link" type="button">Ou ligar a conta e escolher à mão</button>
+    <p id="codewrap" hidden><span id="codeLead"></span> <span id="vurl"></span> · <code id="code"></code></p>
+    <button class="choice" id="pick" type="button">Escolher fotos</button>
+    <p id="picklink" hidden><a id="picker" target="_blank" rel="noopener">Abrir a escolha no telemóvel</a></p>
     <button class="choice" id="close" type="button">Fechar</button>
   </aside>
+  <div id="customize" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
+    <div class="dialog">
+      <h2 id="customizeTitle">Personalizar a parede</h2>
+      <div class="dialog-body">
+        <div class="preview" id="preview">
+          <div class="band top" id="pTop"></div>
+          <div class="band bottom" id="pBottom"></div>
+          <div class="pbar" id="pBar"></div>
+          <div class="pclock" id="pClock">12:34</div>
+        </div>
+        <div class="controls">
+          <label for="oTop" id="oTopLabel"></label>
+          <input type="range" id="oTop" min="0" max="60" step="1" />
+          <label for="oBottom" id="oBottomLabel"></label>
+          <input type="range" id="oBottom" min="0" max="100" step="1" />
+          <label id="oColorLabel"></label>
+          <div class="swatches" id="swatches"></div>
+          <label for="oOpacity" id="oOpacityLabel"></label>
+          <input type="range" id="oOpacity" min="0" max="100" step="1" />
+          <div class="toggle"><span id="oFadeLabel"></span><input type="checkbox" id="oFade" /></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="oReset">Repor</button>
+        <button type="button" id="oDone">Concluído</button>
+      </div>
+    </div>
+  </div>
 <script>
 (function () {
-  var INTERVALS = [[30, "30 s"], [60, "1 min"], [300, "5 min"], [900, "15 min"], [3600, "1 h"]];
-  var state = { items: [], interval_s: 60, weather: {} };
-  var slides = [];
-  var index = 0;
-  var timer = null;
-  var polling = null;
-  var syncing = false;
-  var albumStarted = false;
-  var lang = localStorage.getItem("lume-lang") || "pt";
-  var COPY = {
-    pt: { panel: "Painel", title: "Parede", lead: "Autenticar a conta não actualiza o álbum. Partilha o álbum por link. As fotos são descarregadas antes de entrarem na parede. Se já estiverem cá, a parede abre logo.", album: "Link do álbum", fetch: "Obter álbum", manual: "Ou ligar a conta e escolher à mão", code: "No telemóvel abre", pick: "Escolher fotos", pickOpen: "Abrir a escolha no telemóvel", pace: "Ritmo", sensor: "Sensor de temperatura interior (opcional)", save: "Guardar sensor", close: "Fechar", indoors: "casa", locale: "pt-PT", w_unavailable: "Tempo indisponível", w_clear: "Céu limpo", w_mostly: "Quase limpo", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Nevoeiro", w_drizzle: "Chuvisco", w_rain: "Chuva", w_snow: "Neve", w_thunder: "Trovoada", w_unstable: "Tempo instável" },
-    en: { panel: "Panel", title: "Wall", lead: "Signing in does not update the album. Share it by link. Photos are downloaded before they reach the wall. If they are already here, the wall opens at once.", album: "Album link", fetch: "Fetch album", manual: "Or link the account and pick by hand", code: "On the phone open", pick: "Choose photos", pickOpen: "Open the picker on the phone", pace: "Pace", sensor: "Indoor temperature sensor (optional)", save: "Save sensor", close: "Close", indoors: "indoors", locale: "en-GB", w_unavailable: "Weather unavailable", w_clear: "Clear", w_mostly: "Mostly clear", w_partly: "Partly cloudy", w_cloudy: "Cloudy", w_fog: "Fog", w_drizzle: "Drizzle", w_rain: "Rain", w_snow: "Snow", w_thunder: "Thunder", w_unstable: "Unsettled" },
-    es: { panel: "Panel", title: "Pared", lead: "Iniciar sesión no actualiza el álbum. Compártelo por enlace. Las fotos se descargan antes de entrar en la pared. Si ya están aquí, la pared abre al momento.", album: "Enlace del álbum", fetch: "Obtener álbum", manual: "O vincular la cuenta y elegir a mano", code: "En el teléfono abre", pick: "Elegir fotos", pickOpen: "Abrir la elección en el teléfono", pace: "Ritmo", sensor: "Sensor de temperatura interior (opcional)", save: "Guardar sensor", close: "Cerrar", indoors: "casa", locale: "es-ES", w_unavailable: "Tiempo no disponible", w_clear: "Cielo despejado", w_mostly: "Casi despejado", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Niebla", w_drizzle: "Llovizna", w_rain: "Lluvia", w_snow: "Nieve", w_thunder: "Tormenta", w_unstable: "Tiempo inestable" },
-    fr: { panel: "Panneau", title: "Mur", lead: "Se connecter ne met pas l’album à jour. Partage-le par lien. Les photos sont téléchargées avant d’arriver sur le mur. Si elles sont déjà là, le mur s’ouvre tout de suite.", album: "Lien de l’album", fetch: "Obtenir l’album", manual: "Ou lier le compte et choisir à la main", code: "Sur le téléphone, ouvre", pick: "Choisir des photos", pickOpen: "Ouvrir le choix sur le téléphone", pace: "Rythme", sensor: "Capteur de température intérieure (facultatif)", save: "Enregistrer le capteur", close: "Fermer", indoors: "intérieur", locale: "fr-FR", w_unavailable: "Météo indisponible", w_clear: "Ciel dégagé", w_mostly: "Peu nuageux", w_partly: "Partiellement nuageux", w_cloudy: "Nuageux", w_fog: "Brouillard", w_drizzle: "Bruine", w_rain: "Pluie", w_snow: "Neige", w_thunder: "Orage", w_unstable: "Temps instable" }
-  };
+  var VERSION = "1.2.0";
+  var PACES = [15, 30, 60, 300, 900, 3600];
+  var PACE_LABELS = { 15: "15 s", 30: "30 s", 60: "1 min", 300: "5 min", 900: "15 min", 3600: "1 h" };
+  // Same values as overlay.py (and the Android app's OverlayStyle).
+  var DEFAULT_OVERLAY = { top: 0, bottom: 42, color: "#000000", opacity: 35, fade: false };
+  var MAX_TOP = 60;
+  var SWATCHES = [["#000000", "color_black"], ["#ffffff", "color_white"], ["#0b1e3a", "color_blue"], ["#0f2a1c", "color_green"], ["#2e1f14", "color_brown"], ["#6b6b6b", "color_grey"]];
   var NAMES = { pt: "Português", en: "English", es: "Español", fr: "Français" };
+  var COPY = {
+    pt: {
+      panel: "Painel", title: "Parede",
+      lead: "Partilha o álbum do Google Fotos por link e cola-o aqui. A lista do álbum é lida de hora a hora; cada foto só é descarregada pouco antes de aparecer e fica guardada no Home Assistant. Autenticar a conta não faz o álbum ir atualizando.",
+      album: "Link do álbum", fetch: "Obter álbum", manual: "Ou ligar a conta e escolher à mão", code: "No telemóvel abre", pick: "Escolher fotos", pickOpen: "Abrir a escolha no telemóvel",
+      pace: "Ritmo", sensor: "Sensor de temperatura interior (opcional)", save: "Guardar sensor", close: "Fechar", indoors: "casa", locale: "pt-PT",
+      customize: "Personalizar", customize_title: "Personalizar a parede", overlay_top: "Faixa de cima · %1%", overlay_bottom: "Faixa de baixo · %1%", overlay_color: "Cor das faixas", overlay_opacity: "Opacidade · %1%", overlay_fade: "Esbater para o meio", reset: "Repor", done: "Concluído",
+      color_black: "Preto", color_white: "Branco", color_blue: "Azul escuro", color_green: "Verde escuro", color_brown: "Castanho escuro", color_grey: "Cinzento",
+      album_counts: "Fotos no álbum: %1 · guardadas: %2", picked_counts: "Fotos escolhidas à mão: %1 · guardadas: %2", no_album: "Ainda sem álbum.", empty: "Ainda não há fotos. Abre o painel e cola o link do álbum partilhado.", loading: "A obter a primeira foto…",
+      reading: "A ler o álbum…", asking: "A pedir código…", waiting_phone: "À espera do telemóvel…", linked: "Conta ligada. Já podes escolher as fotos.", opening_pick: "A abrir a escolha…", confirm_phone: "Confirma as fotos no telemóvel.", transfer: "A transferir %1 de %2…", picked: "Fotos guardadas.", sensor_saved: "Sensor guardado.",
+      err_bad_link: "O link tem de ser de um álbum partilhado: photos.app.goo.gl ou photos.google.com/share.", err_not_shared: "Abre o álbum, escolhe Partilhar e copia o link, não o endereço da tua biblioteca.", err_empty: "Não encontrei fotos. Confirma que o álbum está partilhado com «qualquer pessoa com o link».", err_bad_photo_url: "Endereço de foto inesperado.", err_not_image: "O Google não devolveu uma imagem.", err_link_first: "Liga primeiro a conta Google.", err_client_id: "Falta o Client ID na integração.", err_no_session: "O Google não abriu a sessão de escolha.", err_no_code: "Ainda não há código.", err_expired: "O código expirou.", err_no_pick: "Ainda não há uma escolha a decorrer.", err_unknown: "Pedido desconhecido.", err_network: "Sem ligação ao Home Assistant.",
+      w_unavailable: "Tempo indisponível", w_clear: "Céu limpo", w_mostly: "Quase limpo", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Nevoeiro", w_drizzle: "Chuvisco", w_rain: "Chuva", w_snow: "Neve", w_thunder: "Trovoada", w_unstable: "Tempo instável"
+    },
+    en: {
+      panel: "Panel", title: "Wall",
+      lead: "Share the Google Photos album by link and paste it here. The album list is read every hour; each photo is only downloaded shortly before it shows, and stays saved in Home Assistant. Signing in does not keep the album up to date.",
+      album: "Album link", fetch: "Fetch album", manual: "Or link the account and pick by hand", code: "On the phone open", pick: "Choose photos", pickOpen: "Open the picker on the phone",
+      pace: "Pace", sensor: "Indoor temperature sensor (optional)", save: "Save sensor", close: "Close", indoors: "indoors", locale: "en-GB",
+      customize: "Customize", customize_title: "Customize the wall", overlay_top: "Top band · %1%", overlay_bottom: "Bottom band · %1%", overlay_color: "Band colour", overlay_opacity: "Opacity · %1%", overlay_fade: "Fade towards the middle", reset: "Reset", done: "Done",
+      color_black: "Black", color_white: "White", color_blue: "Dark blue", color_green: "Dark green", color_brown: "Dark brown", color_grey: "Grey",
+      album_counts: "Photos in the album: %1 · saved: %2", picked_counts: "Photos picked by hand: %1 · saved: %2", no_album: "No album yet.", empty: "No photos yet. Open the panel and paste the shared album link.", loading: "Fetching the first photo…",
+      reading: "Reading the album…", asking: "Asking for a code…", waiting_phone: "Waiting for the phone…", linked: "Account linked. You can choose the photos.", opening_pick: "Opening the picker…", confirm_phone: "Confirm the photos on the phone.", transfer: "Downloading %1 of %2…", picked: "Photos saved.", sensor_saved: "Sensor saved.",
+      err_bad_link: "The link must be a shared album: photos.app.goo.gl or photos.google.com/share.", err_not_shared: "Open the album, choose Share and copy the link, not your library address.", err_empty: "No photos found. Check that the album is shared with “anyone with the link”.", err_bad_photo_url: "Unexpected photo address.", err_not_image: "Google did not return an image.", err_link_first: "Link the Google account first.", err_client_id: "The integration has no Client ID.", err_no_session: "Google did not open a picking session.", err_no_code: "There is no code yet.", err_expired: "The code expired.", err_no_pick: "No picking in progress.", err_unknown: "Unknown request.", err_network: "Cannot reach Home Assistant.",
+      w_unavailable: "Weather unavailable", w_clear: "Clear", w_mostly: "Mostly clear", w_partly: "Partly cloudy", w_cloudy: "Cloudy", w_fog: "Fog", w_drizzle: "Drizzle", w_rain: "Rain", w_snow: "Snow", w_thunder: "Thunder", w_unstable: "Unsettled"
+    },
+    es: {
+      panel: "Panel", title: "Pared",
+      lead: "Comparte el álbum de Google Fotos por enlace y pégalo aquí. La lista del álbum se lee cada hora; cada foto solo se descarga poco antes de aparecer y queda guardada en Home Assistant. Iniciar sesión no mantiene el álbum al día.",
+      album: "Enlace del álbum", fetch: "Obtener álbum", manual: "O vincular la cuenta y elegir a mano", code: "En el teléfono abre", pick: "Elegir fotos", pickOpen: "Abrir la elección en el teléfono",
+      pace: "Ritmo", sensor: "Sensor de temperatura interior (opcional)", save: "Guardar sensor", close: "Cerrar", indoors: "casa", locale: "es-ES",
+      customize: "Personalizar", customize_title: "Personalizar la pared", overlay_top: "Franja superior · %1%", overlay_bottom: "Franja inferior · %1%", overlay_color: "Color de las franjas", overlay_opacity: "Opacidad · %1%", overlay_fade: "Difuminar hacia el centro", reset: "Restablecer", done: "Listo",
+      color_black: "Negro", color_white: "Blanco", color_blue: "Azul oscuro", color_green: "Verde oscuro", color_brown: "Marrón oscuro", color_grey: "Gris",
+      album_counts: "Fotos en el álbum: %1 · guardadas: %2", picked_counts: "Fotos elegidas a mano: %1 · guardadas: %2", no_album: "Aún sin álbum.", empty: "Todavía no hay fotos. Abre el panel y pega el enlace del álbum compartido.", loading: "Obteniendo la primera foto…",
+      reading: "Leyendo el álbum…", asking: "Pidiendo código…", waiting_phone: "Esperando al teléfono…", linked: "Cuenta vinculada. Ya puedes elegir las fotos.", opening_pick: "Abriendo la elección…", confirm_phone: "Confirma las fotos en el teléfono.", transfer: "Descargando %1 de %2…", picked: "Fotos guardadas.", sensor_saved: "Sensor guardado.",
+      err_bad_link: "El enlace debe ser de un álbum compartido: photos.app.goo.gl o photos.google.com/share.", err_not_shared: "Abre el álbum, elige Compartir y copia el enlace, no la dirección de tu biblioteca.", err_empty: "No encontré fotos. Comprueba que el álbum está compartido con «cualquier persona con el enlace».", err_bad_photo_url: "Dirección de foto inesperada.", err_not_image: "Google no devolvió una imagen.", err_link_first: "Vincula primero la cuenta de Google.", err_client_id: "Falta el Client ID en la integración.", err_no_session: "Google no abrió la sesión de elección.", err_no_code: "Todavía no hay código.", err_expired: "El código caducó.", err_no_pick: "No hay ninguna elección en curso.", err_unknown: "Petición desconocida.", err_network: "Sin conexión con Home Assistant.",
+      w_unavailable: "Tiempo no disponible", w_clear: "Cielo despejado", w_mostly: "Casi despejado", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Niebla", w_drizzle: "Llovizna", w_rain: "Lluvia", w_snow: "Nieve", w_thunder: "Tormenta", w_unstable: "Tiempo inestable"
+    },
+    fr: {
+      panel: "Panneau", title: "Mur",
+      lead: "Partage l’album Google Photos par lien et colle-le ici. La liste de l’album est lue toutes les heures ; chaque photo n’est téléchargée que peu avant d’apparaître, puis reste enregistrée dans Home Assistant. Se connecter ne tient pas l’album à jour.",
+      album: "Lien de l’album", fetch: "Obtenir l’album", manual: "Ou lier le compte et choisir à la main", code: "Sur le téléphone, ouvre", pick: "Choisir des photos", pickOpen: "Ouvrir le choix sur le téléphone",
+      pace: "Rythme", sensor: "Capteur de température intérieure (facultatif)", save: "Enregistrer le capteur", close: "Fermer", indoors: "intérieur", locale: "fr-FR",
+      customize: "Personnaliser", customize_title: "Personnaliser le mur", overlay_top: "Bandeau du haut · %1 %", overlay_bottom: "Bandeau du bas · %1 %", overlay_color: "Couleur des bandeaux", overlay_opacity: "Opacité · %1 %", overlay_fade: "Fondu vers le centre", reset: "Réinitialiser", done: "Terminé",
+      color_black: "Noir", color_white: "Blanc", color_blue: "Bleu foncé", color_green: "Vert foncé", color_brown: "Brun foncé", color_grey: "Gris",
+      album_counts: "Photos dans l’album : %1 · enregistrées : %2", picked_counts: "Photos choisies à la main : %1 · enregistrées : %2", no_album: "Pas encore d’album.", empty: "Pas encore de photos. Ouvre le panneau et colle le lien de l’album partagé.", loading: "Obtention de la première photo…",
+      reading: "Lecture de l’album…", asking: "Demande du code…", waiting_phone: "En attente du téléphone…", linked: "Compte lié. Tu peux choisir les photos.", opening_pick: "Ouverture du choix…", confirm_phone: "Confirme les photos sur le téléphone.", transfer: "Téléchargement %1 sur %2…", picked: "Photos enregistrées.", sensor_saved: "Capteur enregistré.",
+      err_bad_link: "Le lien doit être celui d’un album partagé : photos.app.goo.gl ou photos.google.com/share.", err_not_shared: "Ouvre l’album, choisis Partager et copie le lien, pas l’adresse de ta bibliothèque.", err_empty: "Aucune photo trouvée. Vérifie que l’album est partagé avec « toute personne disposant du lien ».", err_bad_photo_url: "Adresse de photo inattendue.", err_not_image: "Google n’a pas renvoyé d’image.", err_link_first: "Lie d’abord le compte Google.", err_client_id: "L’intégration n’a pas de Client ID.", err_no_session: "Google n’a pas ouvert de session de choix.", err_no_code: "Pas encore de code.", err_expired: "Le code a expiré.", err_no_pick: "Aucun choix en cours.", err_unknown: "Demande inconnue.", err_network: "Home Assistant injoignable.",
+      w_unavailable: "Météo indisponible", w_clear: "Ciel dégagé", w_mostly: "Peu nuageux", w_partly: "Partiellement nuageux", w_cloudy: "Nuageux", w_fog: "Brouillard", w_drizzle: "Bruine", w_rain: "Pluie", w_snow: "Neige", w_thunder: "Orage", w_unstable: "Temps instable"
+    }
+  };
 
+  var state = { interval_s: 60, weather: {}, overlay: DEFAULT_OVERLAY, total: 0, cached: 0 };
+  var lang = localStorage.getItem("lume-lang") || "pt";
+  if (!COPY[lang]) lang = "pt";
+  var langPending = 0;          // language posts still in flight: the server's value is older
+  var style = normalize(DEFAULT_OVERLAY);
+  var styleDirty = false;       // local overlay changes not yet confirmed by the server
+  var styleTimer = null;
+  var shownSeq = -1;
+  var shown = [];
+  var lastRev = -1;
+  var tickTimer = null;
+  var polling = null;
+  var showing = 0;
+  var preloaded = {};
+  var localAt = 0;              // when a setting changed here last; older server answers lose
+
+  function $(id) { return document.getElementById(id); }
   function copy() { return COPY[lang] || COPY.pt; }
+  function tr(key, a, b) {
+    var text = copy()[key] || COPY.pt[key] || key;
+    return text.replace("%1", a == null ? "" : a).replace("%2", b == null ? "" : b);
+  }
+  function errText(err) {
+    var key = err && (err.key || err.error_key);
+    if (key && copy()["err_" + key]) return copy()["err_" + key];
+    if (err && err.message === "Failed to fetch") return tr("err_network");
+    return String((err && (err.message || err.error)) || err || "");
+  }
+  function say(text) { $("msg").textContent = text || ""; }
 
+  // ---- overlay (mirrors overlay.py) ------------------------------------------------
+  function clamp(value, low, high, fallback) {
+    var n = Math.round(Number(value));
+    if (!isFinite(n)) return fallback;
+    return Math.max(low, Math.min(high, n));
+  }
+  function normalize(raw) {
+    raw = raw || {};
+    var top = clamp(raw.top, 0, MAX_TOP, DEFAULT_OVERLAY.top);
+    var bottom = clamp(raw.bottom, 0, 100 - top, Math.min(DEFAULT_OVERLAY.bottom, 100 - top));
+    var color = /^#[0-9a-fA-F]{6}$/.test(raw.color || "") ? raw.color.toLowerCase() : DEFAULT_OVERLAY.color;
+    return { top: top, bottom: bottom, color: color, opacity: clamp(raw.opacity, 0, 100, DEFAULT_OVERLAY.opacity), fade: raw.fade === true || raw.fade === "true" };
+  }
+  function rgb(color) { return [parseInt(color.substr(1, 2), 16), parseInt(color.substr(3, 2), 16), parseInt(color.substr(5, 2), 16)]; }
+  function luminance(color) {
+    var c = rgb(color).map(function (v) { v = v / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function darkText(s) { return luminance(s.color) > 0.5 && s.opacity >= 50; }
+  function rgba(color, alpha) { var c = rgb(color); return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + alpha + ")"; }
+  function paintBands(s, topEl, bottomEl) {
+    var solid = rgba(s.color, s.opacity / 100);
+    var clear = rgba(s.color, 0);
+    topEl.style.height = s.top + "%";
+    bottomEl.style.height = s.bottom + "%";
+    topEl.style.background = s.fade ? "linear-gradient(to bottom, " + solid + " 0%, " + solid + " 40%, " + clear + " 100%)" : solid;
+    bottomEl.style.background = s.fade ? "linear-gradient(to bottom, " + clear + " 0%, " + solid + " 60%, " + solid + " 100%)" : solid;
+  }
+  function applyStyle() {
+    paintBands(style, $("bandTop"), $("bandBottom"));
+    var dark = darkText(style);
+    var root = document.documentElement.style;
+    root.setProperty("--wall-ink", dark ? "#141210" : "#f4f0e8");
+    root.setProperty("--wall-halo", dark ? "0 2px 8px rgba(255,255,255,.6)" : "0 2px 8px rgba(0,0,0,.6)");
+    if ($("customize").classList.contains("on")) renderCustomize();
+  }
+
+  // ---- language --------------------------------------------------------------------
+  function buildMenu(menu, items, current, choose) {
+    menu.innerHTML = "";
+    items.forEach(function (item) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = item[1];
+      if (item[0] === current) b.className = "on";
+      b.onclick = function (event) { event.stopPropagation(); closeMenus(); choose(item[0]); };
+      menu.appendChild(b);
+    });
+  }
+  function closeMenus() {
+    Array.prototype.forEach.call(document.querySelectorAll(".menu.on"), function (m) { m.classList.remove("on"); });
+  }
+  function setLang(code) {
+    if (!COPY[code] || code === lang) return;
+    lang = code;
+    localStorage.setItem("lume-lang", lang);
+    langPending += 1;
+    applyLang();
+    localAt = Date.now();
+    post({ action: "lang", lang: lang }).catch(function () {}).then(function () { langPending -= 1; localAt = Date.now(); });
+  }
+  function setPace(seconds) {
+    state.interval_s = seconds;
+    localAt = Date.now();
+    renderPace();
+    post({ action: "interval", seconds: seconds }).then(function () { localAt = Date.now(); schedule(50); });
+  }
+  function renderPace() {
+    var langs = ["pt", "en", "es", "fr"].map(function (c) { return [c, NAMES[c]]; });
+    buildMenu($("menuLang"), langs, lang, setLang);
+    buildMenu($("menuSheetLang"), langs, lang, setLang);
+    $("menuSheetLang").classList.add("left");
+    buildMenu($("menuPace"), PACES.map(function (p) { return [p, PACE_LABELS[p]]; }), state.interval_s, setPace);
+    $("barLang").textContent = NAMES[lang] + " ▾";
+    $("sheetLang").textContent = NAMES[lang] + " ▾";
+    $("barPace").textContent = (PACE_LABELS[state.interval_s] || state.interval_s + " s") + " ▾";
+    var box = $("intervals");
+    box.innerHTML = "";
+    PACES.forEach(function (seconds) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "choice" + (seconds === state.interval_s ? " on" : "");
+      button.textContent = PACE_LABELS[seconds];
+      button.onclick = function () { setPace(seconds); };
+      box.appendChild(button);
+    });
+  }
   function applyLang() {
     var c = copy();
-    document.getElementById("open").textContent = c.panel;
-    document.getElementById("sheetTitle").textContent = c.title;
-    document.getElementById("sheetLead").textContent = c.lead;
-    document.getElementById("albumLabel").textContent = c.album;
-    document.getElementById("albumGo").textContent = c.fetch;
-    document.getElementById("link").textContent = c.manual;
-    document.getElementById("codeLead").textContent = c.code;
-    document.getElementById("pick").textContent = c.pick;
-    document.getElementById("picker").textContent = c.pickOpen;
-    document.getElementById("paceLabel").textContent = c.pace;
-    document.getElementById("entityLabel").textContent = c.sensor;
-    document.getElementById("saveEntity").textContent = c.save;
-    document.getElementById("close").textContent = c.close;
-    var select = document.getElementById("lang");
-    if (!select.options.length) {
-      ["pt", "en", "es", "fr"].forEach(function (code) {
-        var option = document.createElement("option");
-        option.value = code;
-        option.textContent = NAMES[code];
-        select.appendChild(option);
-      });
-      select.onchange = function () {
-        lang = select.value;
-        localStorage.setItem("lume-lang", lang);
-        post({ action: "lang", lang: lang }).catch(function () {});
-        applyLang();
-        clock();
-      };
-    }
-    select.value = lang;
+    document.documentElement.lang = lang;
+    $("open").textContent = c.panel;
+    $("sheetTitle").textContent = c.title;
+    $("sheetLead").textContent = c.lead;
+    $("albumLabel").textContent = c.album;
+    $("albumGo").textContent = c.fetch;
+    $("link").textContent = c.manual;
+    $("codeLead").textContent = c.code;
+    $("pick").textContent = c.pick;
+    $("picker").textContent = c.pickOpen;
+    $("paceLabel").textContent = c.pace;
+    $("entityLabel").textContent = c.sensor;
+    $("saveEntity").textContent = c.save;
+    $("close").textContent = c.close;
+    $("customizeOpen").textContent = c.customize;
+    $("customizeTitle").textContent = c.customize_title;
+    $("oColorLabel").textContent = c.overlay_color;
+    $("oFadeLabel").textContent = c.overlay_fade;
+    $("oReset").textContent = c.reset;
+    $("oDone").textContent = c.done;
+    $("empty").textContent = state.total ? tr("loading") : tr("empty");
+    renderCounts();
+    renderPace();
+    if ($("customize").classList.contains("on")) renderCustomize();
+    clock();
+  }
+  function renderCounts() {
+    var total = state.total || 0;
+    if (!total) { $("count").textContent = tr("no_album"); return; }
+    $("count").textContent = tr(state.source === "google" ? "picked_counts" : "album_counts", total, state.cached || 0);
   }
 
-  function buildSlides(items) {
-    var out = [];
-    var pending = null;
-    items.forEach(function (item) {
-      if (item.h > item.w) {
-        if (pending) { out.push([pending, item]); pending = null; }
-        else pending = item;
-      } else {
-        if (pending) { out.push([pending]); pending = null; }
-        out.push([item]);
-      }
+  // ---- slides ----------------------------------------------------------------------
+  function preload(photos, done) {
+    var left = photos.length;
+    var finished = false;
+    function one() { left -= 1; if (left <= 0 && !finished) { finished = true; if (done) done(); } }
+    if (!left) { if (done) done(); return; }
+    setTimeout(function () { if (!finished) { finished = true; if (done) done(); } }, 6000);
+    photos.forEach(function (photo) {
+      var img = preloaded[photo.url] || new Image();
+      preloaded[photo.url] = img;
+      if (img.complete && img.naturalWidth) { one(); return; }
+      img.onload = one;
+      img.onerror = one;
+      if (!img.src) img.src = photo.url;
     });
-    if (pending) out.push([pending]);
-    return out;
   }
-
-  function paint() {
-    var stage = document.getElementById("stage");
-    stage.innerHTML = "";
-    var slide = slides[index] || [];
+  function layerFor(slide) {
+    var layer = document.createElement("div");
     var single = slide.length < 2;
     var portrait = single && slide[0] && slide[0].h > slide[0].w;
-    stage.className = single ? (portrait ? "single portrait" : "single") : "";
+    layer.className = "layer" + (single ? (portrait ? " single portrait" : " single") : "");
     slide.forEach(function (photo) {
       var slot = document.createElement("div");
       slot.className = "slot";
@@ -210,84 +454,89 @@
         slot.appendChild(blur);
         slot.appendChild(fg);
       }
-      stage.appendChild(slot);
+      layer.appendChild(slot);
+    });
+    return layer;
+  }
+  function show(slide, seq) {
+    var ticket = ++showing;
+    preload(slide, function () {
+      if (ticket !== showing) return;
+      var stage = $("stage");
+      var layer = layerFor(slide);
+      stage.appendChild(layer);
+      shown = slide;
+      shownSeq = seq;
+      // Next frame, so the opacity transition runs; then drop the old layers.
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        layer.classList.add("on");
+        setTimeout(function () {
+          while (stage.firstChild && stage.firstChild !== layer) stage.removeChild(stage.firstChild);
+        }, 900);
+      }); });
+      if ($("customize").classList.contains("on")) renderCustomize();
     });
   }
-
-  function clock() {
-    var now = new Date();
-    var c = copy();
-    var time = new Intl.DateTimeFormat(c.locale, { timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
-    var day = new Intl.DateTimeFormat(c.locale, { timeZone: "Europe/Lisbon", weekday: "long", day: "numeric", month: "long" }).format(now);
-    document.getElementById("clock").textContent = time;
-    document.getElementById("day").textContent = day;
-    var w = state.weather || {};
-    document.getElementById("temp").textContent = w.temp == null ? "––°" : Math.round(w.temp) + "°";
-    document.getElementById("cond").textContent = c["w_" + (w.key || "unavailable")] || "";
-    document.getElementById("where").textContent = w.indoor == null ? "Coimbra" : "Coimbra · " + c.indoors + " " + w.indoor + "°";
+  function schedule(ms) {
+    if (tickTimer) clearTimeout(tickTimer);
+    tickTimer = setTimeout(tick, ms);
+  }
+  function tick() {
+    fetch("/api/lume/slide", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (data) {
+      if (data.error) throw data;
+      if (data.rev !== lastRev) { lastRev = data.rev; load(); }
+      state.total = data.total; state.cached = data.cached;
+      renderCounts();
+      var empty = !data.slide || !data.slide.length;
+      $("empty").textContent = data.total ? tr("loading") : tr("empty");
+      $("empty").classList.toggle("on", empty && !shown.length);
+      if (!empty && data.seq !== shownSeq) show(data.slide, data.seq);
+      (data.next || []).forEach(function (s) { preload(s); });
+      schedule(Math.max(1000, Math.min(10000, (data.remaining_ms || 0) + 250)));
+    }).catch(function () { schedule(5000); });
   }
 
-  function arm() {
-    if (timer) clearInterval(timer);
-    var seconds = state.interval_s || 60;
-    timer = setInterval(function () {
-      if (!slides.length) return;
-      index = (index + 1) % slides.length;
-      paint();
-    }, seconds * 1000);
-  }
-
-  function renderIntervals() {
-    var box = document.getElementById("intervals");
-    box.innerHTML = "";
-    INTERVALS.forEach(function (pair) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "choice" + (pair[0] === state.interval_s ? " on" : "");
-      button.textContent = pair[1];
-      button.onclick = function () {
-        fetch("/api/lume/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "interval", seconds: pair[0] }) })
-          .then(function () { return load(); });
-      };
-      box.appendChild(button);
-    });
-  }
-
+  // ---- state -----------------------------------------------------------------------
   function load() {
-    return fetch("/api/lume/state").then(function (r) { return r.json(); }).then(function (data) {
-      var sig = (data.items || []).map(function (i) { return i.id; }).join(",");
-      var prev = (state.items || []).map(function (i) { return i.id; }).join(",");
-      state = data;
-      if (sig !== prev) {
-        slides = buildSlides(data.items || []);
-        index = 0;
-        paint();
+    var started = Date.now();
+    return fetch("/api/lume/state", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (data) {
+      if (data.error) throw data;
+      // An answer to a request sent before the last local change still has the old settings.
+      var stale = started <= localAt || langPending > 0;
+      if (stale) {
+        data.lang = lang;
+        data.interval_s = state.interval_s;
+        data.overlay = style;
       }
-      document.getElementById("count").textContent = data.count ? data.count + " fotos guardadas." : "Ainda sem fotos escolhidas.";
-      document.getElementById("entity").value = data.temp_entity || "";
-      if (data.lang && COPY[data.lang]) lang = data.lang;
-      applyLang();
-      var albumInput = document.getElementById("album");
+      if (data.version && data.version !== VERSION && sessionStorage.getItem("lume-reloaded") !== data.version) {
+        // The integration was updated: load the new page once.
+        sessionStorage.setItem("lume-reloaded", data.version);
+        location.reload();
+        return;
+      }
+      state = data;
+      if (data.lang && COPY[data.lang] && data.lang !== lang) {
+        lang = data.lang;
+        localStorage.setItem("lume-lang", lang);
+      }
+      if (!styleDirty) { style = normalize(data.overlay); applyStyle(); }
+      if (typeof data.rev === "number") lastRev = data.rev;
+      $("entity").value = document.activeElement === $("entity") ? $("entity").value : (data.temp_entity || "");
+      var albumInput = $("album");
       if (document.activeElement !== albumInput) albumInput.value = data.album_url || "";
       var flow = data.flow || {};
       if (flow.user_code) {
-        document.getElementById("codewrap").hidden = false;
-        document.getElementById("code").textContent = flow.user_code;
-        document.getElementById("vurl").textContent = flow.verification_url || "google.com/device";
+        $("codewrap").hidden = false;
+        $("code").textContent = flow.user_code;
+        $("vurl").textContent = flow.verification_url || "google.com/device";
       }
       if (flow.picker_uri) {
-        document.getElementById("picklink").hidden = false;
-        document.getElementById("picker").href = flow.picker_uri;
+        $("picklink").hidden = false;
+        $("picker").href = flow.picker_uri;
       }
-      if (flow.error) document.getElementById("msg").textContent = flow.error;
-      renderIntervals();
-      clock();
-      arm();
-      if (!data.count) document.getElementById("sheet").classList.add("on");
-      if (!syncing) maybeAlbum();
-    }).catch(function (err) {
-      document.getElementById("msg").textContent = String(err);
-    });
+      applyLang();
+      if (!data.total && !data.album_url) $("sheet").classList.add("on");
+    }).catch(function (err) { say(errText(err)); });
   }
 
   function post(body) {
@@ -295,119 +544,179 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
-    }).then(function (r) { return r.json().then(function (data) { if (!r.ok) throw new Error(data.error || "erro"); return data; }); });
-  }
-
-  function maybeAlbum() {
-    if (albumStarted || syncing || !state.album_url) return;
-    albumStarted = true;
-    runAlbum(state.album_url, true);
-  }
-
-  function runAlbum(url, quiet) {
-    if (syncing) return;
-    syncing = true;
-    if (!quiet) document.getElementById("msg").textContent = "A ler o álbum…";
-    post({ action: "album_prepare", url: url }).then(function (data) {
-      var step = function () {
-        post({ action: "album_step" }).then(function (res) {
-          if (!quiet) {
-            document.getElementById("msg").textContent = res.done
-              ? "Álbum guardado."
-              : "A obter " + (res.have || 0) + " de " + (res.total || 0) + "…";
-          }
-          if (res.error) document.getElementById("msg").textContent = res.error;
-          if (res.done) {
-            syncing = false;
-            load();
-          } else {
-            step();
-          }
-        }).catch(function (err) {
-          syncing = false;
-          document.getElementById("msg").textContent = String(err.message || err);
-        });
-      };
-      if (!quiet && data.total) {
-        document.getElementById("msg").textContent = "A obter 0 de " + data.total + "…";
-      }
-      step();
-    }).catch(function (err) {
-      syncing = false;
-      document.getElementById("msg").textContent = String(err.message || err);
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) { var e = new Error(data.error || "error"); e.key = data.error_key; throw e; }
+        return data;
+      });
     });
   }
 
-  document.getElementById("albumGo").onclick = function () {
-    runAlbum(document.getElementById("album").value, false);
+  // ---- customize -------------------------------------------------------------------
+  function renderCustomize() {
+    var c = copy();
+    $("oTop").value = style.top;
+    $("oBottom").value = style.bottom;
+    $("oOpacity").value = style.opacity;
+    $("oFade").checked = style.fade;
+    $("oTopLabel").textContent = tr("overlay_top", style.top);
+    $("oBottomLabel").textContent = tr("overlay_bottom", style.bottom);
+    $("oOpacityLabel").textContent = tr("overlay_opacity", style.opacity);
+    var box = $("swatches");
+    box.innerHTML = "";
+    SWATCHES.forEach(function (pair) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "swatch" + (pair[0] === style.color ? " on" : "");
+      b.style.backgroundColor = pair[0];
+      b.title = c[pair[1]];
+      b.setAttribute("aria-label", c[pair[1]]);
+      b.onclick = function () { change({ color: pair[0] }); };
+      box.appendChild(b);
+    });
+    var preview = $("preview");
+    preview.style.backgroundImage = shown.length ? "url('" + shown[0].url + "')" : "none";
+    paintBands(style, $("pTop"), $("pBottom"));
+    var ink = darkText(style) ? "#141210" : "#f4f0e8";
+    var halo = darkText(style) ? "0 2px 8px rgba(255,255,255,.6)" : "0 2px 8px rgba(0,0,0,.6)";
+    ["pClock", "pBar"].forEach(function (id) { $(id).style.color = ink; $(id).style.textShadow = halo; });
+    $("pBar").textContent = c.panel + " · " + (PACE_LABELS[state.interval_s] || "");
+  }
+  function change(patch) {
+    var next = {};
+    ["top", "bottom", "color", "opacity", "fade"].forEach(function (k) { next[k] = style[k]; });
+    for (var k in patch) next[k] = patch[k];
+    if ("top" in patch) next.bottom = Math.min(next.bottom, 100 - next.top);
+    if ("bottom" in patch) next.top = Math.min(next.top, 100 - next.bottom);
+    style = normalize(next);
+    styleDirty = true;
+    localAt = Date.now();
+    applyStyle();
+    if (styleTimer) clearTimeout(styleTimer);
+    styleTimer = setTimeout(saveStyle, 300);
+  }
+  function saveStyle() {
+    styleTimer = null;
+    var sent = style;
+    post({ action: "overlay", overlay: sent }).then(function () {
+      localAt = Date.now();
+      if (sent === style) styleDirty = false;
+    }).catch(function (err) { say(errText(err)); });
+  }
+  $("oTop").oninput = function () { change({ top: Number(this.value) }); };
+  $("oBottom").oninput = function () { change({ bottom: Number(this.value) }); };
+  $("oOpacity").oninput = function () { change({ opacity: Number(this.value) }); };
+  $("oFade").onchange = function () { change({ fade: this.checked }); };
+  $("oReset").onclick = function () { change(normalize(DEFAULT_OVERLAY)); };
+  $("oDone").onclick = function () {
+    if (styleTimer) { clearTimeout(styleTimer); saveStyle(); }
+    $("customize").classList.remove("on");
+  };
+  $("customize").onclick = function (event) { if (event.target === this) $("oDone").onclick(); };
+  $("customizeOpen").onclick = function () {
+    $("sheet").classList.remove("on");
+    $("customize").classList.add("on");
+    renderCustomize();
   };
 
-  document.getElementById("open").onclick = function () { document.getElementById("sheet").classList.add("on"); };
-  document.getElementById("close").onclick = function () { document.getElementById("sheet").classList.remove("on"); };
-  document.getElementById("link").onclick = function () {
-    document.getElementById("msg").textContent = "A pedir código…";
+  // ---- panel -----------------------------------------------------------------------
+  function clock() {
+    var now = new Date();
+    var c = copy();
+    var time = new Intl.DateTimeFormat(c.locale, { timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+    var day = new Intl.DateTimeFormat(c.locale, { timeZone: "Europe/Lisbon", weekday: "long", day: "numeric", month: "long" }).format(now);
+    $("clock").textContent = time;
+    $("pClock").textContent = time;
+    $("day").textContent = day;
+    var w = state.weather || {};
+    $("temp").textContent = w.temp == null ? "––°" : Math.round(w.temp) + "°";
+    $("cond").textContent = c["w_" + (w.key || "unavailable")] || "";
+    $("where").textContent = w.indoor == null ? "Coimbra" : "Coimbra · " + c.indoors + " " + w.indoor + "°";
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-menu]"), function (button) {
+    button.onclick = function (event) {
+      event.stopPropagation();
+      var menu = button.parentNode.querySelector(".menu");
+      var open = menu.classList.contains("on");
+      closeMenus();
+      if (!open) menu.classList.add("on");
+    };
+  });
+  document.addEventListener("click", closeMenus);
+
+  $("albumGo").onclick = function () {
+    say(tr("reading"));
+    post({ action: "album_refresh", url: $("album").value }).then(function (res) {
+      state.total = res.total; state.cached = res.cached;
+      say(tr("album_counts", res.total, res.cached));
+      load();
+      schedule(50);
+    }).catch(function (err) { say(errText(err)); });
+  };
+  $("open").onclick = function (event) { event.stopPropagation(); $("sheet").classList.add("on"); };
+  $("close").onclick = function () { $("sheet").classList.remove("on"); };
+  $("link").onclick = function () {
+    say(tr("asking"));
     post({ action: "device_start" }).then(function (data) {
-      document.getElementById("codewrap").hidden = false;
-      document.getElementById("code").textContent = data.user_code || "";
-      document.getElementById("vurl").textContent = data.verification_url || "";
-      document.getElementById("msg").textContent = "À espera do telemóvel…";
+      $("codewrap").hidden = false;
+      $("code").textContent = data.user_code || "";
+      $("vurl").textContent = data.verification_url || "";
+      say(tr("waiting_phone"));
       if (polling) clearInterval(polling);
       polling = setInterval(function () {
         post({ action: "device_poll" }).then(function (res) {
           if (res.connected) {
             clearInterval(polling);
-            document.getElementById("msg").textContent = "Conta ligada. Já podes escolher as fotos.";
+            say(tr("linked"));
           } else if (res.error) {
             clearInterval(polling);
-            document.getElementById("msg").textContent = res.error;
+            say(errText(res));
           }
-        }).catch(function (err) {
-          clearInterval(polling);
-          document.getElementById("msg").textContent = String(err.message || err);
-        });
+        }).catch(function (err) { clearInterval(polling); say(errText(err)); });
       }, 5000);
-    }).catch(function (err) { document.getElementById("msg").textContent = String(err.message || err); });
+    }).catch(function (err) { say(errText(err)); });
   };
-  document.getElementById("pick").onclick = function () {
-    document.getElementById("msg").textContent = "A abrir a escolha…";
+  $("pick").onclick = function () {
+    say(tr("opening_pick"));
     post({ action: "picker_start" }).then(function (data) {
-      document.getElementById("picklink").hidden = false;
-      document.getElementById("picker").href = data.picker_uri;
-      document.getElementById("msg").textContent = "Confirma as fotos no telemóvel.";
+      $("picklink").hidden = false;
+      $("picker").href = data.picker_uri;
+      say(tr("confirm_phone"));
       if (polling) clearInterval(polling);
       polling = setInterval(function () {
         post({ action: "picker_poll" }).then(function (res) {
           if (res.waiting) return;
-          document.getElementById("msg").textContent = "A transferir " + (res.have || 0) + " de " + (res.total || 0) + "…";
+          if (res.error) { clearInterval(polling); say(errText(res)); return; }
+          say(tr("transfer", res.have || 0, res.total || 0));
           if (res.done) {
             clearInterval(polling);
-            document.getElementById("msg").textContent = "Fotos guardadas.";
+            say(tr("picked"));
             load();
+            schedule(50);
           }
-        }).catch(function (err) {
-          clearInterval(polling);
-          document.getElementById("msg").textContent = String(err.message || err);
-        });
+        }).catch(function (err) { clearInterval(polling); say(errText(err)); });
       }, 2500);
-    }).catch(function (err) { document.getElementById("msg").textContent = String(err.message || err); });
+    }).catch(function (err) { say(errText(err)); });
   };
-  document.getElementById("saveEntity").onclick = function () {
-    post({ action: "entity", entity: document.getElementById("entity").value }).then(function () {
-      document.getElementById("msg").textContent = "Sensor guardado.";
+  $("saveEntity").onclick = function () {
+    post({ action: "entity", entity: $("entity").value }).then(function () {
+      say(tr("sensor_saved"));
       load();
-    });
+    }).catch(function (err) { say(errText(err)); });
   };
   document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") document.getElementById("sheet").classList.remove("on");
+    if (event.key === "Escape") {
+      closeMenus();
+      if ($("customize").classList.contains("on")) $("oDone").onclick();
+      else $("sheet").classList.remove("on");
+    }
   });
   setInterval(clock, 1000);
   setInterval(load, 60000);
-  setInterval(function () {
-    if (state.album_url && !syncing) runAlbum(state.album_url, true);
-  }, 20 * 60 * 1000);
+  applyStyle();
   applyLang();
-  clock();
-  load();
+  load().then(function () { tick(); });
 })();
 </script>
 </body>
