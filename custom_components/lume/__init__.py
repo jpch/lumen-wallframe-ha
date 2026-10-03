@@ -59,31 +59,19 @@ async def async_setup_entry(hass, entry):
     try:
         from homeassistant.components.frontend import async_register_built_in_panel
 
-        async_register_built_in_panel(
-            hass,
-            "iframe",
-            "Lumen-wallframe",
-            "mdi:image-frame",
-            PANEL_PATH,
-            {"url": "/api/lume/app"},
+        # Keyword arguments only: newer Home Assistant versions added positional
+        # parameters (sidebar_default_visible) before frontend_url_path.
+        panel = dict(
+            sidebar_title="Lumen-wallframe",
+            sidebar_icon="mdi:image-frame",
+            frontend_url_path=PANEL_PATH,
+            config={"url": "/api/lume/app"},
             require_admin=False,
-            update=True,
         )
-    except TypeError:
         try:
-            from homeassistant.components.frontend import async_register_built_in_panel
-
-            async_register_built_in_panel(
-                hass,
-                "iframe",
-                "Lumen-wallframe",
-                "mdi:image-frame",
-                PANEL_PATH,
-                {"url": "/api/lume/app"},
-                require_admin=False,
-            )
-        except Exception as err:
-            _LOGGER.warning("Painel Lumen-wallframe não registado: %s", err)
+            async_register_built_in_panel(hass, "iframe", update=True, **panel)
+        except TypeError:
+            async_register_built_in_panel(hass, "iframe", **panel)
     except Exception as err:
         _LOGGER.warning("Painel Lumen-wallframe não registado: %s", err)
     return True
