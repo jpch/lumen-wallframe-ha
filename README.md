@@ -9,8 +9,8 @@ This is the Home Assistant integration of Lumen-wallframe. The Android tablet ap
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jpch&repository=lumen-wallframe-ha&category=integration)
 
 1. Click the button above (HACS must be installed). It opens HACS on your Home Assistant with this repository.
-2. Press **Download**, then restart Home Assistant.
-3. Add the integration:
+2. Press **Download**, then restart Home Assistant. This step is required: until the integration is downloaded and Home Assistant has restarted, the next button shows "This integration does not support configuration via the UI".
+3. Add the integration (every field is optional):
 
    [![Open your Home Assistant instance and start setting up Lumen-wallframe.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=lume)
 
@@ -34,7 +34,7 @@ Linking a Google account (a code on the phone) is only for picking photos by han
 1. At console.cloud.google.com enable the "Photos Picker API".
 2. Set up the OAuth consent screen (external) with your Gmail as a test user.
 3. Create an OAuth client of type "TVs and Limited Input devices".
-4. Paste the Client ID when you add the integration.
+4. Paste the Client ID when you add the integration (or later, by removing and adding it again).
 5. In the panel use "Link with the phone" ("Ligar com o telemóvel"), then "Choose photos" ("Escolher fotos"). The picking address is also left in a persistent Home Assistant notification.
 
 ## Indoor temperature

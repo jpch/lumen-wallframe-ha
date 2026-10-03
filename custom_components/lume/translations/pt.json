@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lumen-wallframe",
+        "description": "Tudo é opcional. O álbum partilhado do Google Photos configura-se depois, no painel Lumen-wallframe. O Client ID (Photos Picker API, tipo TV e dispositivos de entrada limitada) só é preciso para escolher fotos à mão.",
+        "data": {
+          "client_id": "Client ID (opcional)",
+          "client_secret": "Client secret (opcional)",
+          "interval_s": "Segundos entre fotos",
+          "temp_entity": "Sensor de temperatura interior (opcional)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "O Lumen-wallframe já está instalado."
+    }
+  }
+}
