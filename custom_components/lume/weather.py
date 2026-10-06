@@ -10,7 +10,8 @@ import urllib.parse
 import urllib.request
 
 COIMBRA = (40.2033, -8.4103)
-UA = "Lume/1.0 (photo frame)"
+COIMBRA_PLACE = {"name": "Coimbra", "region": "", "lat": 40.2033, "lon": -8.4103}
+UA = "Lumen-wallframe/1.0 (photo frame)"
 
 
 def weather_key(code):
@@ -85,6 +86,42 @@ def lisbon_parts(lang="pt"):
     return clock, i18n.date_line(lang, now.tm_wday, now.tm_mday, now.tm_mon)
 
 
+def coord(value):
+    """Four decimals with a dot (MET Norway's limit), never a decimal comma or an exponent."""
+    return "%.4f" % float(value)
+
+
+def default_place():
+    return dict(COIMBRA_PLACE)
+
+
+def normalize_place(raw):
+    """A weather place dict. Missing or invalid fields fall back to Coimbra."""
+    raw = raw or {}
+    try:
+        lat = float(raw.get("lat"))
+        lon = float(raw.get("lon"))
+    except (TypeError, ValueError):
+        return default_place()
+    name = (raw.get("name") or "").strip()
+    if not name:
+        return default_place()
+    return {
+        "name": name,
+        "region": (raw.get("region") or "").strip(),
+        "lat": lat,
+        "lon": lon,
+    }
+
+
+def place_label(place):
+    """'Lisboa (Distrito de Lisboa, Portugal)', or just the name when there is no region."""
+    place = normalize_place(place)
+    if place["region"]:
+        return "%s (%s)" % (place["name"], place["region"])
+    return place["name"]
+
+
 def _get_json(url, headers=None, timeout=20):
     hdrs = {"User-Agent": UA, "Accept": "application/json"}
     if headers:
@@ -98,8 +135,59 @@ def _get_json(url, headers=None, timeout=20):
     return json.loads(raw.decode("utf-8"))
 
 
-def _met_no():
-    url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=%s&lon=%s" % COIMBRA
+def geocode(query, language="en"):
+    """Looks a typed place up with the Open-Meteo geocoding API (no key).
+
+    "Coimbra" takes the best match; "Coimbra, Brasil" or "Porto, PT" keeps only matches whose
+    country, country code or region contains the part after the comma. Returns None when
+    nothing matches. Raises when the lookup itself fails (no network, bad answer).
+    """
+    text = (query or "").strip()
+    if not text:
+        return None
+    if "," in text:
+        name, hint = text.split(",", 1)
+        name, hint = name.strip(), hint.strip()
+    else:
+        name, hint = text, ""
+    if not name:
+        return None
+    lang = (language or "en").strip() or "en"
+    count = 1 if not hint else 20
+    url = (
+        "https://geocoding-api.open-meteo.com/v1/search?name=%s&count=%d&language=%s&format=json"
+        % (urllib.parse.quote(name), count, urllib.parse.quote(lang))
+    )
+    data = _get_json(url)
+    results = data.get("results") or []
+    hint_l = hint.lower()
+    for item in results:
+        if "latitude" not in item or "longitude" not in item:
+            continue
+        country = item.get("country") or ""
+        admin = item.get("admin1") or ""
+        code = item.get("country_code") or ""
+        if hint_l and hint_l not in country.lower() and hint_l not in admin.lower() and hint_l not in code.lower():
+            continue
+        found_name = (item.get("name") or "").strip() or name
+        region_parts = []
+        for part in (admin, country):
+            if part and part.lower() != found_name.lower():
+                region_parts.append(part)
+        return {
+            "name": found_name,
+            "region": ", ".join(region_parts),
+            "lat": float(item["latitude"]),
+            "lon": float(item["longitude"]),
+        }
+    return None
+
+
+def _met_no(lat, lon):
+    url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=%s&lon=%s" % (
+        coord(lat),
+        coord(lon),
+    )
     req = urllib.request.Request(
         url,
         headers={"User-Agent": UA, "Accept": "application/json"},
@@ -116,11 +204,14 @@ def _met_no():
     return {"temp": temp, "key": symbol_key(summary.get("symbol_code"))}
 
 
-def fetch_coimbra():
+def fetch(lat=None, lon=None):
+    """Current weather at lat/lon (defaults to Coimbra): Open-Meteo first, MET Norway if that fails."""
+    if lat is None or lon is None:
+        lat, lon = COIMBRA
     url = (
         "https://api.open-meteo.com/v1/forecast"
-        "?latitude=%s&longitude=%s&current_weather=true&timezone=Europe%%2FLisbon"
-        % COIMBRA
+        "?latitude=%s&longitude=%s&current_weather=true&timezone=auto"
+        % (coord(lat), coord(lon))
     )
     try:
         data = _get_json(url)
@@ -133,7 +224,12 @@ def fetch_coimbra():
         code = current.get("weathercode")
         return {"temp": temp, "key": weather_key(code)}
     except Exception:
-        return _met_no()
+        return _met_no(lat, lon)
+
+
+def fetch_coimbra():
+    """Backwards-compatible alias for fetch at Coimbra."""
+    return fetch(*COIMBRA)
 
 
 def fetch_indoor(base_url, token, entity_id):
