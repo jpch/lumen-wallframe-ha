@@ -129,6 +129,18 @@
   .swatch.on { border: 3px solid var(--amber); padding: 4px; }
   .toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 14px; }
   .toggle input { width: 22px; height: 22px; accent-color: var(--amber); }
+  .divider { height: 1px; background: #3a3530; margin: 14px 0 6px; }
+  .place-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .place-row input { flex: 1; min-width: 0; }
+  .place-row button {
+    flex: 0 0 auto; background: var(--amber); color: #1a140c; border: 0; border-radius: 10px;
+    font: inherit; padding: 10px 14px; cursor: pointer;
+  }
+  .place-row button:disabled { opacity: .5; cursor: default; }
+  .place-now { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .place-status { font-size: 13px; color: var(--amber); margin-top: 4px; min-height: 1.2em; }
+  .preview .pweather { position: absolute; right: 12px; bottom: 10px; font-size: 12px; font-weight: 400; }
+  .hud .clock-wrap[hidden], .hud .weather-wrap[hidden] { display: none !important; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .dialog-actions button { background: transparent; border: 0; color: var(--amber); font: inherit; padding: 10px 14px; cursor: pointer; border-radius: 10px; }
   .dialog-actions button:hover { background: rgba(231,177,90,.12); }
@@ -140,11 +152,11 @@
   <div class="band bottom" id="bandBottom"></div>
   <div id="empty"></div>
   <div class="hud">
-    <div>
+    <div class="clock-wrap" id="clockWrap">
       <div class="time" id="clock">––:––</div>
       <div class="day" id="day"></div>
     </div>
-    <div>
+    <div class="weather-wrap" id="weatherWrap">
       <div class="temp" id="temp">––°</div>
       <div class="cond" id="cond"></div>
       <div class="where" id="where">Coimbra</div>
@@ -189,6 +201,7 @@
           <div class="band bottom" id="pBottom"></div>
           <div class="pbar" id="pBar"></div>
           <div class="pclock" id="pClock">12:34</div>
+          <div class="pweather" id="pWeather">18° · Coimbra</div>
         </div>
         <div class="controls">
           <label for="oTop" id="oTopLabel"></label>
@@ -200,6 +213,16 @@
           <label for="oOpacity" id="oOpacityLabel"></label>
           <input type="range" id="oOpacity" min="0" max="100" step="1" />
           <div class="toggle"><span id="oFadeLabel"></span><input type="checkbox" id="oFade" /></div>
+          <div class="divider"></div>
+          <div class="toggle"><span id="oClockLabel"></span><input type="checkbox" id="oClock" /></div>
+          <div class="toggle"><span id="oWeatherLabel"></span><input type="checkbox" id="oWeather" /></div>
+          <label for="oPlace" id="oPlaceLabel"></label>
+          <div class="place-row">
+            <input id="oPlace" type="text" autocomplete="off" />
+            <button type="button" id="oPlaceFind">Procurar</button>
+          </div>
+          <div class="place-now" id="oPlaceNow"></div>
+          <div class="place-status" id="oPlaceStatus"></div>
         </div>
       </div>
       <div class="dialog-actions">
@@ -210,7 +233,7 @@
   </div>
 <script>
 (function () {
-  var VERSION = "1.2.0";
+  var VERSION = "1.3.0";
   var PACES = [15, 30, 60, 300, 900, 3600];
   var PACE_LABELS = { 15: "15 s", 30: "30 s", 60: "1 min", 300: "5 min", 900: "15 min", 3600: "1 h" };
   // Same values as overlay.py (and the Android app's OverlayStyle).
@@ -229,6 +252,7 @@
       album_counts: "Fotos no álbum: %1 · guardadas: %2", picked_counts: "Fotos escolhidas à mão: %1 · guardadas: %2", no_album: "Ainda sem álbum.", empty: "Ainda não há fotos. Abre o painel e cola o link do álbum partilhado.", loading: "A obter a primeira foto…",
       reading: "A ler o álbum…", asking: "A pedir código…", waiting_phone: "À espera do telemóvel…", linked: "Conta ligada. Já podes escolher as fotos.", opening_pick: "A abrir a escolha…", confirm_phone: "Confirma as fotos no telemóvel.", transfer: "A transferir %1 de %2…", picked: "Fotos guardadas.", sensor_saved: "Sensor guardado.",
       err_bad_link: "O link tem de ser de um álbum partilhado: photos.app.goo.gl ou photos.google.com/share.", err_not_shared: "Abre o álbum, escolhe Partilhar e copia o link, não o endereço da tua biblioteca.", err_empty: "Não encontrei fotos. Confirma que o álbum está partilhado com «qualquer pessoa com o link».", err_bad_photo_url: "Endereço de foto inesperado.", err_not_image: "O Google não devolveu uma imagem.", err_link_first: "Liga primeiro a conta Google.", err_client_id: "Falta o Client ID na integração.", err_no_session: "O Google não abriu a sessão de escolha.", err_no_code: "Ainda não há código.", err_expired: "O código expirou.", err_no_pick: "Ainda não há uma escolha a decorrer.", err_unknown: "Pedido desconhecido.", err_network: "Sem ligação ao Home Assistant.",
+      show_clock: "Mostrar horas", show_weather: "Mostrar meteorologia", weather_place: "Local da meteorologia", weather_place_find: "Procurar", weather_place_now: "Agora: %1", weather_place_searching: "A procurar…", weather_place_not_found: "Não encontrei esse local. Fica %1.", weather_place_error: "Não consegui procurar (sem rede?). Fica %1.",
       w_unavailable: "Tempo indisponível", w_clear: "Céu limpo", w_mostly: "Quase limpo", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Nevoeiro", w_drizzle: "Chuvisco", w_rain: "Chuva", w_snow: "Neve", w_thunder: "Trovoada", w_unstable: "Tempo instável"
     },
     en: {
@@ -241,6 +265,7 @@
       album_counts: "Photos in the album: %1 · saved: %2", picked_counts: "Photos picked by hand: %1 · saved: %2", no_album: "No album yet.", empty: "No photos yet. Open the panel and paste the shared album link.", loading: "Fetching the first photo…",
       reading: "Reading the album…", asking: "Asking for a code…", waiting_phone: "Waiting for the phone…", linked: "Account linked. You can choose the photos.", opening_pick: "Opening the picker…", confirm_phone: "Confirm the photos on the phone.", transfer: "Downloading %1 of %2…", picked: "Photos saved.", sensor_saved: "Sensor saved.",
       err_bad_link: "The link must be a shared album: photos.app.goo.gl or photos.google.com/share.", err_not_shared: "Open the album, choose Share and copy the link, not your library address.", err_empty: "No photos found. Check that the album is shared with “anyone with the link”.", err_bad_photo_url: "Unexpected photo address.", err_not_image: "Google did not return an image.", err_link_first: "Link the Google account first.", err_client_id: "The integration has no Client ID.", err_no_session: "Google did not open a picking session.", err_no_code: "There is no code yet.", err_expired: "The code expired.", err_no_pick: "No picking in progress.", err_unknown: "Unknown request.", err_network: "Cannot reach Home Assistant.",
+      show_clock: "Show the clock", show_weather: "Show the weather", weather_place: "Weather location", weather_place_find: "Find", weather_place_now: "Now: %1", weather_place_searching: "Searching…", weather_place_not_found: "I could not find that place. Keeping %1.", weather_place_error: "I could not search (no network?). Keeping %1.",
       w_unavailable: "Weather unavailable", w_clear: "Clear", w_mostly: "Mostly clear", w_partly: "Partly cloudy", w_cloudy: "Cloudy", w_fog: "Fog", w_drizzle: "Drizzle", w_rain: "Rain", w_snow: "Snow", w_thunder: "Thunder", w_unstable: "Unsettled"
     },
     es: {
@@ -253,6 +278,7 @@
       album_counts: "Fotos en el álbum: %1 · guardadas: %2", picked_counts: "Fotos elegidas a mano: %1 · guardadas: %2", no_album: "Aún sin álbum.", empty: "Todavía no hay fotos. Abre el panel y pega el enlace del álbum compartido.", loading: "Obteniendo la primera foto…",
       reading: "Leyendo el álbum…", asking: "Pidiendo código…", waiting_phone: "Esperando al teléfono…", linked: "Cuenta vinculada. Ya puedes elegir las fotos.", opening_pick: "Abriendo la elección…", confirm_phone: "Confirma las fotos en el teléfono.", transfer: "Descargando %1 de %2…", picked: "Fotos guardadas.", sensor_saved: "Sensor guardado.",
       err_bad_link: "El enlace debe ser de un álbum compartido: photos.app.goo.gl o photos.google.com/share.", err_not_shared: "Abre el álbum, elige Compartir y copia el enlace, no la dirección de tu biblioteca.", err_empty: "No encontré fotos. Comprueba que el álbum está compartido con «cualquier persona con el enlace».", err_bad_photo_url: "Dirección de foto inesperada.", err_not_image: "Google no devolvió una imagen.", err_link_first: "Vincula primero la cuenta de Google.", err_client_id: "Falta el Client ID en la integración.", err_no_session: "Google no abrió la sesión de elección.", err_no_code: "Todavía no hay código.", err_expired: "El código caducó.", err_no_pick: "No hay ninguna elección en curso.", err_unknown: "Petición desconocida.", err_network: "Sin conexión con Home Assistant.",
+      show_clock: "Mostrar la hora", show_weather: "Mostrar el tiempo", weather_place: "Lugar del tiempo", weather_place_find: "Buscar", weather_place_now: "Ahora: %1", weather_place_searching: "Buscando…", weather_place_not_found: "No encontré ese lugar. Se queda %1.", weather_place_error: "No pude buscar (¿sin red?). Se queda %1.",
       w_unavailable: "Tiempo no disponible", w_clear: "Cielo despejado", w_mostly: "Casi despejado", w_partly: "Parcialmente nublado", w_cloudy: "Nublado", w_fog: "Niebla", w_drizzle: "Llovizna", w_rain: "Lluvia", w_snow: "Nieve", w_thunder: "Tormenta", w_unstable: "Tiempo inestable"
     },
     fr: {
@@ -265,17 +291,21 @@
       album_counts: "Photos dans l’album : %1 · enregistrées : %2", picked_counts: "Photos choisies à la main : %1 · enregistrées : %2", no_album: "Pas encore d’album.", empty: "Pas encore de photos. Ouvre le panneau et colle le lien de l’album partagé.", loading: "Obtention de la première photo…",
       reading: "Lecture de l’album…", asking: "Demande du code…", waiting_phone: "En attente du téléphone…", linked: "Compte lié. Tu peux choisir les photos.", opening_pick: "Ouverture du choix…", confirm_phone: "Confirme les photos sur le téléphone.", transfer: "Téléchargement %1 sur %2…", picked: "Photos enregistrées.", sensor_saved: "Capteur enregistré.",
       err_bad_link: "Le lien doit être celui d’un album partagé : photos.app.goo.gl ou photos.google.com/share.", err_not_shared: "Ouvre l’album, choisis Partager et copie le lien, pas l’adresse de ta bibliothèque.", err_empty: "Aucune photo trouvée. Vérifie que l’album est partagé avec « toute personne disposant du lien ».", err_bad_photo_url: "Adresse de photo inattendue.", err_not_image: "Google n’a pas renvoyé d’image.", err_link_first: "Lie d’abord le compte Google.", err_client_id: "L’intégration n’a pas de Client ID.", err_no_session: "Google n’a pas ouvert de session de choix.", err_no_code: "Pas encore de code.", err_expired: "Le code a expiré.", err_no_pick: "Aucun choix en cours.", err_unknown: "Demande inconnue.", err_network: "Home Assistant injoignable.",
+      show_clock: "Afficher l’heure", show_weather: "Afficher la météo", weather_place: "Lieu de la météo", weather_place_find: "Chercher", weather_place_now: "Maintenant : %1", weather_place_searching: "Recherche…", weather_place_not_found: "Je n’ai pas trouvé ce lieu. On garde %1.", weather_place_error: "Je n’ai pas pu chercher (pas de réseau ?). On garde %1.",
       w_unavailable: "Météo indisponible", w_clear: "Ciel dégagé", w_mostly: "Peu nuageux", w_partly: "Partiellement nuageux", w_cloudy: "Nuageux", w_fog: "Brouillard", w_drizzle: "Bruine", w_rain: "Pluie", w_snow: "Neige", w_thunder: "Orage", w_unstable: "Temps instable"
     }
   };
 
-  var state = { interval_s: 60, weather: {}, overlay: DEFAULT_OVERLAY, total: 0, cached: 0 };
+  var state = { interval_s: 60, weather: {}, overlay: DEFAULT_OVERLAY, show_clock: true, show_weather: true, place: { name: "Coimbra", region: "", lat: 40.2033, lon: -8.4103 }, place_label: "Coimbra", total: 0, cached: 0 };
   var lang = localStorage.getItem("lume-lang") || "pt";
   if (!COPY[lang]) lang = "pt";
   var langPending = 0;          // language posts still in flight: the server's value is older
   var style = normalize(DEFAULT_OVERLAY);
   var styleDirty = false;       // local overlay changes not yet confirmed by the server
   var styleTimer = null;
+  var infoDirty = false;        // local clock/weather/place changes not yet confirmed
+  var infoTimer = null;
+  var placeSearching = false;
   var shownSeq = -1;
   var shown = [];
   var lastRev = -1;
@@ -406,6 +436,10 @@
     $("customizeTitle").textContent = c.customize_title;
     $("oColorLabel").textContent = c.overlay_color;
     $("oFadeLabel").textContent = c.overlay_fade;
+    $("oClockLabel").textContent = c.show_clock;
+    $("oWeatherLabel").textContent = c.show_weather;
+    $("oPlaceLabel").textContent = c.weather_place;
+    $("oPlaceFind").textContent = c.weather_place_find;
     $("oReset").textContent = c.reset;
     $("oDone").textContent = c.done;
     $("empty").textContent = state.total ? tr("loading") : tr("empty");
@@ -507,6 +541,10 @@
         data.lang = lang;
         data.interval_s = state.interval_s;
         data.overlay = style;
+        data.show_clock = state.show_clock;
+        data.show_weather = state.show_weather;
+        data.place = state.place;
+        data.place_label = state.place_label;
       }
       if (data.version && data.version !== VERSION && sessionStorage.getItem("lume-reloaded") !== data.version) {
         // The integration was updated: load the new page once.
@@ -520,6 +558,11 @@
         localStorage.setItem("lume-lang", lang);
       }
       if (!styleDirty) { style = normalize(data.overlay); applyStyle(); }
+      // Defaults for installs that pre-date the wall-info settings.
+      if (typeof state.show_clock !== "boolean") state.show_clock = true;
+      if (typeof state.show_weather !== "boolean") state.show_weather = true;
+      if (!state.place || !state.place.name) state.place = { name: "Coimbra", region: "", lat: 40.2033, lon: -8.4103 };
+      if (!state.place_label) state.place_label = state.place.name;
       if (typeof data.rev === "number") lastRev = data.rev;
       $("entity").value = document.activeElement === $("entity") ? $("entity").value : (data.temp_entity || "");
       var albumInput = $("album");
@@ -559,6 +602,8 @@
     $("oBottom").value = style.bottom;
     $("oOpacity").value = style.opacity;
     $("oFade").checked = style.fade;
+    $("oClock").checked = state.show_clock !== false;
+    $("oWeather").checked = state.show_weather !== false;
     $("oTopLabel").textContent = tr("overlay_top", style.top);
     $("oBottomLabel").textContent = tr("overlay_bottom", style.bottom);
     $("oOpacityLabel").textContent = tr("overlay_opacity", style.opacity);
@@ -579,8 +624,76 @@
     paintBands(style, $("pTop"), $("pBottom"));
     var ink = darkText(style) ? "#141210" : "#f4f0e8";
     var halo = darkText(style) ? "0 2px 8px rgba(255,255,255,.6)" : "0 2px 8px rgba(0,0,0,.6)";
-    ["pClock", "pBar"].forEach(function (id) { $(id).style.color = ink; $(id).style.textShadow = halo; });
+    ["pClock", "pBar", "pWeather"].forEach(function (id) { $(id).style.color = ink; $(id).style.textShadow = halo; });
     $("pBar").textContent = c.panel + " · " + (PACE_LABELS[state.interval_s] || "");
+    $("pClock").style.display = state.show_clock !== false ? "" : "none";
+    $("pWeather").style.display = state.show_weather !== false ? "" : "none";
+    $("pWeather").textContent = "18° · " + ((state.place && state.place.name) || "Coimbra");
+    if (document.activeElement !== $("oPlace") && !placeSearching) {
+      $("oPlace").value = (state.place && state.place.name) || "";
+    }
+    $("oPlaceNow").textContent = tr("weather_place_now", state.place_label || ((state.place && state.place.name) || "Coimbra"));
+    $("oPlaceFind").disabled = placeSearching || !$("oPlace").value.trim();
+  }
+  function changeInfo(patch) {
+    if ("show_clock" in patch) state.show_clock = !!patch.show_clock;
+    if ("show_weather" in patch) state.show_weather = !!patch.show_weather;
+    if (patch.place) {
+      state.place = patch.place;
+      state.place_label = patch.place_label || patch.place.name || "Coimbra";
+    }
+    infoDirty = true;
+    localAt = Date.now();
+    clock();
+    if ($("customize").classList.contains("on")) renderCustomize();
+    if (infoTimer) clearTimeout(infoTimer);
+    infoTimer = setTimeout(saveInfo, 300);
+  }
+  function saveInfo() {
+    infoTimer = null;
+    var body = {
+      action: "wall_info",
+      show_clock: state.show_clock !== false,
+      show_weather: state.show_weather !== false,
+      place: state.place
+    };
+    post(body).then(function (res) {
+      localAt = Date.now();
+      if (res.wall_info) {
+        state.show_clock = res.wall_info.show_clock !== false;
+        state.show_weather = res.wall_info.show_weather !== false;
+        state.place = res.wall_info.place || state.place;
+        state.place_label = res.wall_info.place_label || state.place_label;
+      }
+      infoDirty = false;
+      clock();
+      if ($("customize").classList.contains("on")) renderCustomize();
+      // Refresh weather for a new place.
+      load();
+    }).catch(function (err) { say(errText(err)); });
+  }
+  function findPlace() {
+    var query = ($("oPlace").value || "").trim();
+    if (placeSearching || !query) return;
+    placeSearching = true;
+    var keep = (state.place && state.place.name) || "Coimbra";
+    $("oPlaceStatus").textContent = tr("weather_place_searching");
+    $("oPlaceFind").disabled = true;
+    post({ action: "geocode", query: query, lang: lang }).then(function (res) {
+      placeSearching = false;
+      if (!res.place) {
+        $("oPlaceStatus").textContent = tr("weather_place_not_found", keep);
+        renderCustomize();
+        return;
+      }
+      $("oPlaceStatus").textContent = "";
+      $("oPlace").value = res.place.name;
+      changeInfo({ place: res.place, place_label: res.place.region ? (res.place.name + " (" + res.place.region + ")") : res.place.name });
+    }).catch(function () {
+      placeSearching = false;
+      $("oPlaceStatus").textContent = tr("weather_place_error", keep);
+      renderCustomize();
+    });
   }
   function change(patch) {
     var next = {};
@@ -607,9 +720,15 @@
   $("oBottom").oninput = function () { change({ bottom: Number(this.value) }); };
   $("oOpacity").oninput = function () { change({ opacity: Number(this.value) }); };
   $("oFade").onchange = function () { change({ fade: this.checked }); };
+  $("oClock").onchange = function () { changeInfo({ show_clock: this.checked }); };
+  $("oWeather").onchange = function () { changeInfo({ show_weather: this.checked }); };
+  $("oPlace").oninput = function () { $("oPlaceFind").disabled = placeSearching || !this.value.trim(); };
+  $("oPlace").onkeydown = function (event) { if (event.key === "Enter") { event.preventDefault(); findPlace(); } };
+  $("oPlaceFind").onclick = function () { findPlace(); };
   $("oReset").onclick = function () { change(normalize(DEFAULT_OVERLAY)); };
   $("oDone").onclick = function () {
     if (styleTimer) { clearTimeout(styleTimer); saveStyle(); }
+    if (infoTimer) { clearTimeout(infoTimer); saveInfo(); }
     $("customize").classList.remove("on");
   };
   $("customize").onclick = function (event) { if (event.target === this) $("oDone").onclick(); };
@@ -628,10 +747,15 @@
     $("clock").textContent = time;
     $("pClock").textContent = time;
     $("day").textContent = day;
+    var showClock = state.show_clock !== false;
+    var showWeather = state.show_weather !== false;
+    $("clockWrap").hidden = !showClock;
+    $("weatherWrap").hidden = !showWeather;
     var w = state.weather || {};
+    var placeName = (state.place && state.place.name) || w.place || "Coimbra";
     $("temp").textContent = w.temp == null ? "––°" : Math.round(w.temp) + "°";
     $("cond").textContent = c["w_" + (w.key || "unavailable")] || "";
-    $("where").textContent = w.indoor == null ? "Coimbra" : "Coimbra · " + c.indoors + " " + w.indoor + "°";
+    $("where").textContent = w.indoor == null ? placeName : (placeName + " · " + c.indoors + " " + w.indoor + "°");
   }
 
   Array.prototype.forEach.call(document.querySelectorAll("[data-menu]"), function (button) {

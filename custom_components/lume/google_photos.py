@@ -16,7 +16,7 @@ DEVICE_URL = "https://oauth2.googleapis.com/device/code"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 PICKER = "https://photospicker.googleapis.com/v1"
-UA = "Lume/1.0 (Raspberry Pi photo frame)"
+UA = "Lumen-wallframe/1.0 (Raspberry Pi photo frame)"
 
 
 class ApiError(Exception):

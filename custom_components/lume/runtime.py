@@ -23,7 +23,7 @@ from . import weather
 from .library import Library, safe_name
 from .slides import build_slides
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 PHOTO_EDGE = 1920
 ALBUM_CHECK_S = 60 * 60
 PACES = (15, 30, 60, 300, 900, 3600)
@@ -299,6 +299,63 @@ class Runtime(object):
         self._bump()
         return self.mem["overlay"]
 
+    def wall_place(self):
+        data = self._data()
+        return weather.normalize_place(
+            {
+                "name": data.get("weather_place"),
+                "region": data.get("weather_region"),
+                "lat": data.get("weather_lat"),
+                "lon": data.get("weather_lon"),
+            }
+        )
+
+    def show_clock(self):
+        return self._data().get("show_clock") is not False
+
+    def show_weather(self):
+        return self._data().get("show_weather") is not False
+
+    def wall_info(self):
+        place = self.wall_place()
+        return {
+            "show_clock": self.show_clock(),
+            "show_weather": self.show_weather(),
+            "place": place,
+            "place_label": weather.place_label(place),
+        }
+
+    def set_wall_info(self, info):
+        """Clock/weather toggles and weather place. Missing keys keep the current value."""
+        info = info or {}
+        data = self._data()
+        if "show_clock" in info:
+            self.mem["show_clock"] = bool(info.get("show_clock"))
+        if "show_weather" in info:
+            self.mem["show_weather"] = bool(info.get("show_weather"))
+        if "place" in info and info.get("place") is not None:
+            place = weather.normalize_place(info.get("place"))
+        elif any(k in info for k in ("weather_place", "weather_lat", "weather_lon")):
+            place = weather.normalize_place(
+                {
+                    "name": info.get("weather_place", data.get("weather_place")),
+                    "region": info.get("weather_region", data.get("weather_region")),
+                    "lat": info.get("weather_lat", data.get("weather_lat")),
+                    "lon": info.get("weather_lon", data.get("weather_lon")),
+                }
+            )
+        else:
+            place = None
+        if place is not None:
+            self.mem["weather_place"] = place["name"]
+            self.mem["weather_region"] = place["region"]
+            self.mem["weather_lat"] = str(place["lat"])
+            self.mem["weather_lon"] = str(place["lon"])
+            # Force a fresh forecast for the new place.
+            self.weather_cache = {"at": 0, "temp": None, "label": "…"}
+        self._bump()
+        return self.wall_info()
+
     # -- album -----------------------------------------------------------------------
 
     def album_url(self):
@@ -382,15 +439,26 @@ class Runtime(object):
 
     def weather(self):
         now = time.time()
-        if now - float(self.weather_cache.get("at") or 0) < 600 and self.weather_cache.get("temp") is not None:
+        place = self.wall_place()
+        cached_place = self.weather_cache.get("place") or {}
+        same_place = (
+            cached_place.get("lat") == place["lat"]
+            and cached_place.get("lon") == place["lon"]
+        )
+        if (
+            same_place
+            and now - float(self.weather_cache.get("at") or 0) < 600
+            and self.weather_cache.get("temp") is not None
+        ):
             return self.weather_cache
         try:
-            current = weather.fetch_coimbra()
+            current = weather.fetch(place["lat"], place["lon"])
             self.weather_cache = {
                 "at": now,
                 "temp": current.get("temp"),
                 "key": current.get("key") or "unavailable",
                 "label": current.get("key") or "unavailable",
+                "place": place,
             }
         except Exception as exc:
             self.weather_cache = {
@@ -398,6 +466,7 @@ class Runtime(object):
                 "temp": self.weather_cache.get("temp"),
                 "key": self.weather_cache.get("key") or "unavailable",
                 "label": self.weather_cache.get("key") or "unavailable",
+                "place": place,
                 "error": str(exc),
             }
         return self.weather_cache
@@ -419,6 +488,10 @@ class Runtime(object):
             "album_url": data.get("album_url") or flow.get("album_url") or "",
             "lang": data.get("lang") or "pt",
             "overlay": self.overlay_style(),
+            "show_clock": self.show_clock(),
+            "show_weather": self.show_weather(),
+            "place": self.wall_place(),
+            "place_label": weather.place_label(self.wall_place()),
             "source": self.library.source,
             "total": total,
             "cached": cached,
@@ -430,6 +503,7 @@ class Runtime(object):
                 "temp": meteo.get("temp"),
                 "key": meteo.get("key") or "unavailable",
                 "indoor": indoor,
+                "place": self.wall_place()["name"],
             },
             "flow": {
                 "user_code": flow.get("user_code") or "",

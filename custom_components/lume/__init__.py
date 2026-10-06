@@ -235,6 +235,19 @@ class LumeActionView(HomeAssistantView):
                 result = {"ok": True, "lang": runtime._data().get("lang")}
             elif action == "overlay":
                 result = {"ok": True, "overlay": runtime.set_overlay(body.get("overlay") or {})}
+            elif action == "wall_info":
+                result = {"ok": True, "wall_info": runtime.set_wall_info(body)}
+            elif action == "geocode":
+                query = body.get("query") or ""
+                lang = body.get("lang") or runtime._data().get("lang") or "pt"
+
+                def lookup():
+                    from . import weather as weather_mod
+
+                    return weather_mod.geocode(query, lang)
+
+                place = await hass.async_add_executor_job(lookup)
+                result = {"ok": True, "place": place}
             elif action in ("album_refresh", "album_prepare"):
                 # album_prepare is what 1.1.x wall pages send; it now only reads the list.
                 target = body.get("url") or ""

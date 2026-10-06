@@ -1,6 +1,6 @@
 # Lumen-wallframe for Home Assistant
 
-A photo wall inside Home Assistant: Lisbon time, Coimbra weather, and photos from a shared Google Photos album, with two portrait photos side by side.
+A photo wall inside Home Assistant: Lisbon time, weather for a chosen place (Coimbra by default), and photos from a shared Google Photos album, with two portrait photos side by side.
 
 This is the Home Assistant integration of Lumen-wallframe. The Android tablet app and the Raspberry Pi frame are separate.
 
@@ -40,7 +40,7 @@ Linking a Google account (a code on the phone) is only for picking photos by han
 
 ## Customize, pace and language
 
-- **Personalizar** (Customize) in the panel sets the info bands over the photo: the top band (0–60 % of the screen height, default 0), the bottom band (0–100 %, default 42; the two together never pass 100 %), the colour (black, white, dark blue, dark green, dark brown, grey), the opacity (0–100 %, default 35) and an optional fade towards the middle. The wall changes as you move the sliders; **Repor** (Reset) goes back to the defaults. On a strong white band the clock and weather turn dark.
+- **Personalizar** (Customize) in the panel sets the info bands over the photo: the top band (0–60 % of the screen height, default 0), the bottom band (0–100 %, default 42; the two together never pass 100 %), the colour (black, white, dark blue, dark green, dark brown, grey), the opacity (0–100 %, default 35) and an optional fade towards the middle. Switches show or hide the clock and the weather; the weather location is any town looked up with Open-Meteo (Coimbra by default). The wall changes as you move the controls; **Repor** (Reset) only resets the bands. On a strong white band the clock and weather turn dark.
 - The pace goes from 15 s to 1 h, in the panel or from the menu at the top right of the wall.
 - The language menu (Português, English, Español, Français) is at the top right of the wall and of the panel.
 
@@ -48,7 +48,7 @@ The settings are kept in the integration's config entry, so they survive restart
 
 ## Indoor temperature
 
-Optional. In the panel, enter a temperature sensor entity (for example `sensor.temperatura_sala`) to show it on the wall. The Coimbra weather does not use it.
+Optional. In the panel, enter a temperature sensor entity (for example `sensor.temperatura_sala`) to show it on the wall. The outdoor weather does not use it.
 
 ## Development
 

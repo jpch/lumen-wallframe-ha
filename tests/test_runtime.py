@@ -170,6 +170,32 @@ class RuntimeTests(unittest.TestCase):
         self.assertGreater(rt.rev, rev)
         json.dumps(rt.mem)
 
+    def test_wall_info_defaults_and_place(self):
+        rt = self.make()
+        info = rt.wall_info()
+        self.assertTrue(info["show_clock"])
+        self.assertTrue(info["show_weather"])
+        self.assertEqual("Coimbra", info["place"]["name"])
+        rev = rt.rev
+        out = rt.set_wall_info(
+            {
+                "show_clock": False,
+                "show_weather": True,
+                "place": {"name": "Lisboa", "region": "Portugal", "lat": 38.7223, "lon": -9.1393},
+            }
+        )
+        self.assertFalse(out["show_clock"])
+        self.assertEqual("Lisboa", out["place"]["name"])
+        self.assertIn("Portugal", out["place_label"])
+        state = rt.public_state(21.5)
+        self.assertFalse(state["show_clock"])
+        self.assertEqual("Lisboa", state["place"]["name"])
+        self.assertEqual("Lisboa", state["weather"]["place"])
+        self.assertGreater(rt.rev, rev)
+        # Old entries without the keys keep the previous behaviour.
+        rt2 = self.make({"interval_s": 60})
+        self.assertTrue(rt2.public_state(None)["show_clock"])
+
     def test_old_manifest_is_taken_over(self):
         cache = os.path.join(self.root, "lume", "cache")
         os.makedirs(cache)
